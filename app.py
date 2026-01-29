@@ -130,8 +130,10 @@ def reset_entries_from_dataset():
 @app.route('/', methods=('GET', 'POST'))
 def add_data():
     role = request.args.get('role', 'sale')
+    origin = request.args.get('origin', 'http://127.0.0.1:8080')
     if request.method == 'POST':
-        # Preserve role in redirect
+        # Preserve role and origin in redirect
+        origin = request.form.get('origin', origin)
         
         date_entry = request.form['date']
         entry_type = request.form['entry_type']
@@ -205,7 +207,7 @@ def add_data():
                 print(f"Error syncing to checking_account_main: {e}")
         # ------------------------------------
 
-        return redirect(url_for('add_data', role=role))
+        return redirect(url_for('add_data', role=role, origin=origin))
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     month = request.args.get('month')
@@ -258,6 +260,7 @@ def add_data():
     return render_template(
         "add_data.html",
         role=role,
+        origin=origin,
         today=date.today(),
         now=datetime.now(),
         transactions=rows,
@@ -272,6 +275,7 @@ def add_data():
 @app.route('/delete_entry/<int:id>', methods=['POST'])
 def delete_entry(id):
     role = request.args.get('role', 'sale')
+    origin = request.args.get('origin', 'http://127.0.0.1:8080')
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -284,11 +288,67 @@ def delete_entry(id):
                 conn.close()
                 return "Error: Sales users can only delete entries within 72 hours.", 403
     
+    # --- SYNC DELETION TO REPORTING DB ---
+    try:
+        cur.execute("SELECT date, entry_type, category, description, balance FROM entries WHERE id = %s", (id,))
+        entry_to_delete = cur.fetchone()
+        if entry_to_delete:
+            d_date, d_type, d_cat, d_desc, d_bal = entry_to_delete
+            
+            r_conn = get_reporting_db_connection()
+            r_cur = r_conn.cursor()
+            
+            if d_cat == 'Payroll':
+                r_cur.execute(
+                    """
+                    DELETE FROM payroll_history
+                    WHERE pay_date = %s
+                      AND employee_name = %s
+                      AND total_business_cost = %s
+                      AND ctid IN (
+                          SELECT ctid FROM payroll_history
+                          WHERE pay_date = %s
+                            AND employee_name = %s
+                            AND total_business_cost = %s
+                          LIMIT 1
+                      )
+                    """,
+                    (d_date, d_desc, d_bal, d_date, d_desc, d_bal)
+                )
+            else:
+                db_type_val = 'Credit' if d_type == 'income' else 'Debit'
+                r_cur.execute(
+                    """
+                    DELETE FROM checking_account_main
+                    WHERE date = %s
+                      AND category = %s
+                      AND description = %s
+                      AND type = %s
+                      AND amount = %s
+                      AND ctid IN (
+                          SELECT ctid FROM checking_account_main
+                          WHERE date = %s
+                            AND category = %s
+                            AND description = %s
+                            AND type = %s
+                            AND amount = %s
+                          LIMIT 1
+                      )
+                    """,
+                    (d_date, d_cat, d_desc, db_type_val, d_bal, d_date, d_cat, d_desc, db_type_val, d_bal)
+                )
+            r_conn.commit()
+            r_cur.close()
+            r_conn.close()
+    except Exception as e:
+        print(f"Error syncing deletion: {e}")
+    # -------------------------------------
+
     cur.execute("DELETE FROM entries WHERE id = %s", (id,))
     conn.commit()
     cur.close()
     conn.close()
-    return redirect(url_for('add_data', role=role))
+    return redirect(url_for('add_data', role=role, origin=origin))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
