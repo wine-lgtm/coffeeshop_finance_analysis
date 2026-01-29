@@ -1,0 +1,30 @@
+body { display: flex; background: #fdfaf9; margin: 0; font-family: 'Segoe UI', sans-serif; }
+.sidebar { width: 70px; height: 100vh; background: #2b1d1a; position: fixed; left: 0; top: 0; transition: 0.3s; z-index: 1000; overflow: hidden; }
+.sidebar:hover { width: 240px; }
+#dashboard-section { margin-left: 70px; padding: 40px; transition: 0.3s; width: 100%; }
+.sidebar:hover ~ #dashboard-section { margin-left: 240px; }
+
+.sidebar .user-profile { display: flex; align-items: center; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.sidebar .user-profile img { width: 40px; height: 40px; border-radius: 8px; margin-right: 15px; }
+.sidebar .user-name { color: white; white-space: nowrap; opacity: 0; transition: 0.3s; }
+.sidebar:hover .user-name { opacity: 1; }
+
+.sidebar ul { list-style: none; padding: 10px 0; }
+.sidebar ul li a { text-decoration: none; color: #a9abbf; display: flex; align-items: center; padding: 15px 25px; transition: 0.3s; }
+.sidebar ul li a i { font-size: 20px; min-width: 30px; }
+.sidebar .text { margin-left: 15px; opacity: 0; transition: 0.3s; white-space: nowrap; }
+.sidebar:hover .text { opacity: 1; }
+.sidebar ul li a:hover { background: #6f4e37; color: white; }
+
+.manage-expense-card, .report-container { background: white; padding: 40px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+.premium-table { width: 100%; border-collapse: collapse; }
+.premium-table th { background: #5d4037; color: white; padding: 15px; text-align: left; }
+.premium-table td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+
+.btn-action { border: none; padding: 12px 25px; border-radius: 10px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+.btn-new { background: #b08968; color: white; }
+.btn-del { background: #e74c3c; color: white; }
+.btn-save { background: #3e2723; color: white; }
+.btn-action:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.delete-icon-btn { background: #fee2e2; color: #ef4444; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.hidden { display: none !important; }

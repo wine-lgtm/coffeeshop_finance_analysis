@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Update & Record</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #f6efe7;
+            --text: #3f2f25;
+            --muted: #7a6a5f;
+            --card: #ffffff;
+            --brand: #8b5e34;
+            --brand-light: #d4a373;
+            --border: #e7d7c9;
+            --input-bg: #ffffff;
+            --shadow: rgba(63, 47, 37, 0.08);
+            --expense-bg: #fde68a;
+            --expense-text: #78350f;
+            --income-bg: #a7f3d0;
+            --income-text: #065f46;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+        }
+        /* Sidebar Styles */
+        .sidebar { width: 70px; height: 100vh; background: #2b1d1a; position: fixed; left: 0; top: 0; transition: 0.3s; z-index: 1000; overflow: hidden; }
+        .sidebar:hover { width: 240px; }
+        .sidebar .user-profile { display: flex; align-items: center; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar .user-profile img { width: 40px; height: 40px; border-radius: 8px; margin-right: 15px; }
+        .sidebar .user-name { color: white; white-space: nowrap; opacity: 0; transition: 0.3s; }
+        .sidebar:hover .user-name { opacity: 1; }
+        .sidebar ul { list-style: none; padding: 10px 0; margin: 0; }
+        .sidebar ul li a { text-decoration: none; color: #a9abbf; display: flex; align-items: center; padding: 15px 25px; transition: 0.3s; }
+        .sidebar ul li a i { font-size: 20px; min-width: 30px; }
+        .sidebar .text { margin-left: 15px; opacity: 0; transition: 0.3s; white-space: nowrap; }
+        .sidebar:hover .text { opacity: 1; }
+        .sidebar ul li a:hover { background: #6f4e37; color: white; }
+
+        .main-content {
+            margin-left: 70px;
+            padding: 20px;
+            transition: 0.3s;
+        }
+        .sidebar:hover ~ .main-content {
+            margin-left: 240px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px var(--shadow);
+            margin-bottom: 24px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--text);
+        }
+        .date-display {
+            color: var(--muted);
+            font-size: 14px;
+        }
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--input-bg);
+            box-sizing: border-box; /* Fix width issues */
+        }
+        input:focus, select:focus {
+            outline: 2px solid var(--brand-light);
+            border-color: var(--brand);
+        }
+        button.submit-btn {
+            background-color: var(--brand);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button.submit-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Table Styles */
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+        }
+        .totals {
+            display: flex;
+            gap: 10px;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .badge.income { background: var(--income-bg); color: var(--income-text); }
+        .badge.expense { background: var(--expense-bg); color: var(--expense-text); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        th {
+            background-color: #fcf8f5;
+            color: var(--muted);
+            font-weight: 600;
+        }
+        .pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+        .pill.income { background: var(--income-bg); color: var(--income-text); }
+        .pill.expense { background: var(--expense-bg); color: var(--expense-text); }
+        /* Payroll Section Styles */
+        .payroll-section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 2px solid var(--brand);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar-nav" class="sidebar">
+        <div class="user-profile">
+            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="User">
+            <span class="user-name" id="role-text">{% if role == 'admin' %}Administrator{% else %}Sale Person{% endif %}</span>
+        </div>
+        <ul>
+            <li><a href="http://127.0.0.1:8082/"><i class="fa-solid fa-house"></i><span class="text">Dashboard</span></a></li>
+            <li><a href="javascript:void(0)" class="active"><i class="fas fa-file-alt"></i><span class="text">Manage cash entry</span></a></li>
+            <li><a href="http://127.0.0.1:8082/#budget-page"><i class="fas fa-wallet"></i> <span class="text">Manage Budget</span> </a></li>
+            <li><a href="http://127.0.0.1:8082/#report-page"><i class="fas fa-paper-plane"></i><span class="text" id="report-link-text">Reports</span></a></li>
+            <li><a href="http://127.0.0.1:8082/?action=logout"><i class="fas fa-sign-out-alt"></i><span class="text">Logout</span></a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+    
+    <!-- Admin Payroll Section -->
+    {% if role == 'admin' %}
+    <div class="card payroll-section">
+        <div class="header">
+            <h2><i class="fas fa-money-check-alt"></i> Employee Payroll Entry</h2>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="entry_type" value="expense">
+            <input type="hidden" name="category" value="Payroll">
+            <input type="hidden" name="staff_name" value="Admin">
+            
+            <div>
+                <label>Employee Name</label>
+                <input type="text" name="description" placeholder="Employee Name" required>
+            </div>
+            <div>
+                <label>Payroll Details</label>
+                <input type="text" name="details" placeholder="e.g. January Salary, Bonus">
+            </div>
+            <div>
+                <label>Date</label>
+                <input type="date" name="date" value="{{ today }}">
+            </div>
+            <div>
+                <label>Amount (MMK)</label>
+                <input type="number" name="balance" step="0.01" placeholder="0.00" required>
+            </div>
+            <div class="full-width">
+                <button type="submit" class="submit-btn">Record Payroll</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Form Card -->
+    <div class="card">
+        <div class="header">
+            <h2>Cafe Record</h2>
+            <span class="date-display">Today: {{ today }}</span>
+        </div>
+        <form method="POST">
+            <div>
+                <label>Category</label>
+                <select name="category" id="categorySelect" required></select>
+            </div>
+            <div>
+                <label>Type</label>
+                <select name="entry_type" id="typeSelect">
+                    <option value="expense" selected>Expense</option>
+                    <option value="income">Income</option>
+                </select>
+            </div>
+            <div>
+                <label>Description</label>
+                <select name="description" id="descriptionSelect"></select>
+            </div>
+            <div>
+                <label>Details</label>
+                <input type="text" name="details" id="detailsInput" list="detailsList" placeholder="e.g. Electricity">
+                <datalist id="detailsList"></datalist>
+            </div>
+            <div>
+                <label>Date</label>
+                <input type="date" name="date" value="{{ today }}">
+            </div>
+            <div>
+                <label>Amount (MMK)</label>
+                <input type="number" name="balance" id="balanceInput" step="0.01" placeholder="0.00" required>
+            </div>
+            
+            {% if role == 'sale' %}
+            <div>
+                <label>Staff name</label>
+                <input type="text" name="staff_name" placeholder="Who is recording this?" required>
+            </div>
+            {% else %}
+            <!-- Hidden for Admin -->
+            <input type="hidden" name="staff_name" value="Admin">
+            {% endif %}
+            
+            <div class="full-width">
+                <button type="submit" class="submit-btn">Update Record</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- List Card -->
+    <div class="card">
+        <div class="controls-row">
+            <h2>Transactions</h2>
+            <div class="totals">
+                <span class="badge income">Income {{ "%.2f"|format(total_income) }}</span>
+                <span class="badge expense">Expenses {{ "%.2f"|format(total_expense) }}</span>
+            </div>
+        </div>
+        <form method="GET" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+            <div>
+                <label style="display:inline; margin-right:5px;">Month</label>
+                <select name="month" style="width: 120px;">
+                    <option value="" {{ not selected_month and 'selected' or '' }}>All</option>
+                    <option value="1"  {{ selected_month == 1 and 'selected' or '' }}>Jan</option>
+                    <option value="2"  {{ selected_month == 2 and 'selected' or '' }}>Feb</option>
+                    <option value="3"  {{ selected_month == 3 and 'selected' or '' }}>Mar</option>
+                    <option value="4"  {{ selected_month == 4 and 'selected' or '' }}>Apr</option>
+                    <option value="5"  {{ selected_month == 5 and 'selected' or '' }}>May</option>
+                    <option value="6"  {{ selected_month == 6 and 'selected' or '' }}>Jun</option>
+                    <option value="7"  {{ selected_month == 7 and 'selected' or '' }}>Jul</option>
+                    <option value="8"  {{ selected_month == 8 and 'selected' or '' }}>Aug</option>
+                    <option value="9"  {{ selected_month == 9 and 'selected' or '' }}>Sep</option>
+                    <option value="10" {{ selected_month == 10 and 'selected' or '' }}>Oct</option>
+                    <option value="11" {{ selected_month == 11 and 'selected' or '' }}>Nov</option>
+                    <option value="12" {{ selected_month == 12 and 'selected' or '' }}>Dec</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:inline; margin-right:5px;">Year</label>
+                <select name="year" style="width: 120px;">
+                    <option value="" {{ not selected_year and 'selected' or '' }}>All</option>
+                    {% for y in available_years %}
+                    <option value="{{ y }}" {{ selected_year == y and 'selected' or '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-left: auto;">
+                <button type="submit" class="submit-btn" style="width:auto; padding:8px 12px;">Filter</button>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Details</th>
+                    <th class="amount-col">Amount (MMK)</th>
+                    <th>Staff</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.date }}</td>
+                    <td><span class="pill {{ t.entry_type }}">{{ t.entry_type }}</span></td>
+                    <td>{{ t.category }}</td>
+                    <td>{{ t.description or '-' }}</td>
+                    <td>{{ t.details or '-' }}</td>
+                    <td class="amount-col">{{ "%.2f"|format(t.balance) }}</td>
+                    <td>{{ t.staff_name or '-' }}</td>
+                    <td>
+                        {% if role == 'admin' %}
+                        <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role) }}" onsubmit="return confirm('Are you sure you want to delete this entry?');">
+                            <button type="submit" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        </form>
+                        {% elif role == 'sale' %}
+                            {% if t.created_at and (now - t.created_at).total_seconds() < 72*3600 %}
+                            <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role) }}" onsubmit="return confirm('Delete this entry? (Allowed within 72hr)');">
+                                <button type="submit" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                            </form>
+                            {% else %}
+                            <i class="fas fa-lock" style="color:#ccc" title="Locked after 72 hours"></i>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" style="text-align:center; padding: 20px;">No records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script type="application/json" id="categories-data">
+    {{ categories_map | tojson | default({}, true) }}
+</script>
+
+<script>
+    // Configuration from your requirement image context
+    const typeSelect = document.getElementById('typeSelect');
+    const categorySelect = document.getElementById('categorySelect');
+    const descSelect = document.getElementById('descriptionSelect');
+    const detailsInput = document.getElementById('detailsInput');
+    const detailsList = document.getElementById('detailsList');
+    const balanceInput = document.getElementById('balanceInput');
+    
+    const categoriesMap = JSON.parse(document.getElementById('categories-data').textContent);
+
+
+    // Description mapping constrained by subcategory selection
+    const detailsByDescription = {
+        'Utility Bill Payment': ['Electricity','Water','Internet','Gas'],
+        'Utilities': ['Electricity','Water','Internet','Gas'],
+        'Marketing': ['Facebook Ads','Local Print Shop'],
+        'Marketing / promotion': ['Facebook Ads','Local Print Shop'],
+        'Daily Sales Deposit': ['Coffee Sales','Bakery Sales'],
+        'Rent Payment': ['Monthly Rent'],
+        'Bakery Payment': ['Bakery supplies'],
+        'Coffee Supplier Payment': ['Coffee beans'],
+        'Ingredients / Groceries': ['Milk','Sugar','Flour','Eggs'],
+        'Packaging': ['Cups','Lids','Bags'],
+        'Equipment purchase': ['Grinder','Machine','Oven'],
+        'Taxes / licenses / bank fees': ['Taxes','Licenses','Bank Fees'],
+        'Staff meal': ['Staff meal'],
+        'Miscellaneous': ['Misc']
+    };
+
+    const allowedDescriptionsByCategory = {
+        'Sales Revenue': ['Daily Sales Deposit','Coffee Sales','Bakery Sales'],
+        'COGS': ['Bakery Payment','Coffee Supplier Payment','Supplies','Ingredients / Groceries','Packaging'],
+        'Operating Expense': ['Utilities','Utility Bill Payment','Marketing','Marketing / promotion','Taxes / licenses / bank fees','Rent Payment','Miscellaneous','Staff meal','Equipment purchase','Local Print Shop','Facebook Ads','Utility Company']
+    };
+
+    function updateCategories() {
+        const type = typeSelect.value;
+        const allowed = type === 'income' ? ['Sales Revenue'] : ['COGS','Operating Expense'];
+        const existing = Object.keys(categoriesMap).filter(c => allowed.includes(c));
+        const categories = existing.length ? existing : allowed;
+        categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+        updateDescriptionsForCategory();
+    }
+
+    function updateDescriptionsForCategory() {
+        const cat = categorySelect.value;
+        const rawDescs = categoriesMap[cat] || [];
+        const allowedDescs = allowedDescriptionsByCategory[cat] || rawDescs;
+        const descs = rawDescs.filter(d => allowedDescs.includes(d)).concat(allowedDescs.filter(d => !rawDescs.includes(d)));
+       
+
+        const finalDescs = descs.length ? descs : ['Other'];
+        descSelect.innerHTML = finalDescs.map(d => `<option value="${d}">${d}</option>`).join('');
+        updateDetails();
+    }
+
+    typeSelect.addEventListener('change', updateCategories);
+    categorySelect.addEventListener('change', updateDescriptionsForCategory);
+    descSelect.addEventListener('change', updateDetails);
+
+    // Initialize
+    updateCategories();
+
+    function updateDetails() {
+        const desc = descSelect.value;
+        const opts = detailsByDescription[desc] || [];
+        detailsList.innerHTML = opts.map(o => `<option value="${o}">`).join('');
+    }
+</script>
+
+    </div>
+</body>
+</html>
+
