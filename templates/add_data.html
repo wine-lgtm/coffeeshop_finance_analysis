@@ -184,11 +184,11 @@
             <span class="user-name" id="role-text">{% if role == 'admin' %}Administrator{% else %}Sale Person{% endif %}</span>
         </div>
         <ul>
-            <li><a href="http://127.0.0.1:8082/"><i class="fa-solid fa-house"></i><span class="text">Dashboard</span></a></li>
+            <li><a href="{{ origin }}/"><i class="fa-solid fa-house"></i><span class="text">Dashboard</span></a></li>
             <li><a href="javascript:void(0)" class="active"><i class="fas fa-file-alt"></i><span class="text">Manage cash entry</span></a></li>
-            <li><a href="http://127.0.0.1:8082/#budget-page"><i class="fas fa-wallet"></i> <span class="text">Manage Budget</span> </a></li>
-            <li><a href="http://127.0.0.1:8082/#report-page"><i class="fas fa-paper-plane"></i><span class="text" id="report-link-text">Reports</span></a></li>
-            <li><a href="http://127.0.0.1:8082/?action=logout"><i class="fas fa-sign-out-alt"></i><span class="text">Logout</span></a></li>
+            <li><a href="{{ origin }}/#budget-page"><i class="fas fa-wallet"></i> <span class="text">Manage Budget</span> </a></li>
+            <li><a href="{{ origin }}/#report-page"><i class="fas fa-paper-plane"></i><span class="text" id="report-link-text">{% if role == 'admin' %}Intelligence Report{% else %}Submit Report{% endif %}</span></a></li>
+            <li><a href="javascript:void(0)" onclick="performLogout()"><i class="fas fa-sign-out-alt"></i><span class="text">Logout</span></a></li>
         </ul>
     </div>
 
@@ -202,6 +202,7 @@
             <h2><i class="fas fa-money-check-alt"></i> Employee Payroll Entry</h2>
         </div>
         <form method="POST">
+            <input type="hidden" name="origin" value="{{ origin }}">
             <input type="hidden" name="entry_type" value="expense">
             <input type="hidden" name="category" value="Payroll">
             <input type="hidden" name="staff_name" value="Admin">
@@ -291,6 +292,8 @@
             </div>
         </div>
         <form method="GET" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="role" value="{{ role }}">
+            <input type="hidden" name="origin" value="{{ origin }}">
             <div>
                 <label style="display:inline; margin-right:5px;">Month</label>
                 <select name="month" style="width: 120px;">
@@ -348,12 +351,12 @@
                     <td>{{ t.staff_name or '-' }}</td>
                     <td>
                         {% if role == 'admin' %}
-                        <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role) }}" onsubmit="return confirm('Are you sure you want to delete this entry?');">
+                        <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role, origin=origin) }}" onsubmit="return confirm('Are you sure you want to delete this entry?');">
                             <button type="submit" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>
                         </form>
                         {% elif role == 'sale' %}
                             {% if t.created_at and (now - t.created_at).total_seconds() < 72*3600 %}
-                            <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role) }}" onsubmit="return confirm('Delete this entry? (Allowed within 72hr)');">
+                            <form method="POST" action="{{ url_for('delete_entry', id=t.id, role=role, origin=origin) }}" onsubmit="return confirm('Delete this entry? (Allowed within 72hr)');">
                                 <button type="submit" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>
                             </form>
                             {% else %}
@@ -437,6 +440,11 @@
 
     // Initialize
     updateCategories();
+
+    function performLogout() {
+        localStorage.removeItem('coffee_user_role');
+        window.location.href = '{{ origin }}/?action=logout';
+    }
 
     function updateDetails() {
         const desc = descSelect.value;
