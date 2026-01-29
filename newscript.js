@@ -17,9 +17,11 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
 
     if (email === "owner@coffee.com" && pass === "admin123") {
         currentUserRole = "admin";
+        localStorage.setItem('coffee_user_role', 'admin');
         initSystem("Administrator");
     } else if (email === "sale@coffee.com" && pass === "sale123") {
         currentUserRole = "sale";
+        localStorage.setItem('coffee_user_role', 'sale');
         initSystem("Sale Person");
     } else {
         alert("Invalid credentials!");
@@ -333,30 +335,75 @@ function updateChartsWithBackendData(trendData, breakdown) {
 }
 
 function showSection(id) {
+    const section = document.getElementById(id);
+    if (!section) return;
+
     document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active-section'));
-    document.getElementById(id).classList.add('active-section');
-    if (id === 'report' && currentUserRole === 'admin') {
+    section.classList.add('active-section');
+    if (id === 'report-page' && currentUserRole === 'admin') {
         setTimeout(generateFilteredReport, 100);
     }
 }
 
 function updateUI() {
+    // ====== Expenses Processing ======
     let exTotal = 0;
     let dashExpHTML = "";
     let manageExpHTML = "";
+    
     transactionHistory.forEach((item, idx) => {
         exTotal += item.amt;
-        dashExpHTML += `<tr><td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td style="color:red">-$${item.amt.toLocaleString()}</td></tr>`;
-        manageExpHTML += `<tr><td style="text-align:center"><input type="checkbox" class="row-checkbox" data-index="${idx}"></td><td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td style="color:red">-$${item.amt.toLocaleString()}</td><td><button class="delete-icon-btn" onclick="deleteHistoryItem(${idx})"><i class="fas fa-trash"></i></button></td></tr>`;
+        dashExpHTML += `<tr><td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td>${item.payer}</td><td style="color:red">-$${item.amt.toLocaleString()}</td></tr>`;
+        manageExpHTML += `
+            <tr>
+                <td style="text-align:center"><input type="checkbox" class="row-checkbox" data-index="${idx}"></td>
+                <td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td>${item.payer}</td>
+                <td style="color:red">-$${item.amt.toLocaleString()}</td>
+                <td>${currentUserRole === 'admin' ? `<button class="delete-icon-btn" onclick="deleteHistoryItem(${idx})"><i class="fas fa-trash"></i></button>` : `<i class="fas fa-lock" style="color:#ccc"></i>`}</td>
+            </tr>
+        `;
     });
-    let incTotal = incomeHistory.reduce((s, i) => s + i.amt, 0);
-    let incHTML = incomeHistory.map((item, idx) => `<tr><td style="text-align:center"><input type="checkbox" class="income-row-checkbox" data-index="${idx}"></td><td>${item.desc}</td><td>${item.date}</td><td style="color:green">+$${item.amt.toLocaleString()}</td><td><button class="delete-icon-btn" onclick="deleteIncomeItem(${idx})"><i class="fas fa-trash"></i></button></td></tr>`).join('');
-    document.getElementById('card-income').innerText = `$${incTotal.toLocaleString()}`;
+
+    // ====== Income Processing ======
+    let currentIncomeTotal = 0;
+    let incomeHTML = "";
+    
+    incomeHistory.forEach((item, idx) => {
+        currentIncomeTotal += item.amt;
+        incomeHTML += `
+            <tr>
+                <td style="text-align:center"><input type="checkbox" class="income-row-checkbox" data-index="${idx}"></td>
+                <td>${item.desc}</td><td>${item.source}</td><td>${item.date}</td><td>${item.receiver}</td>
+                <td style="color:green">+$${item.amt.toLocaleString()}</td>
+                <td>${currentUserRole === 'admin' ? `<button class="delete-icon-btn" onclick="deleteIncomeItem(${idx})"><i class="fas fa-trash"> </i></button>` : `<i class="fas fa-lock" style="color:#ccc"></i>`}</td>
+            </tr>
+        `;
+    });
+
+    // Update global total and storage
+    totalIncome = currentIncomeTotal;
+    localStorage.setItem('coffee_income_total', totalIncome);
+
+    // ====== Update Cards ======
+    document.getElementById('card-income').innerText = `$${totalIncome.toLocaleString()}`;
     document.getElementById('card-total').innerText = `$${exTotal.toLocaleString()}`;
-    document.getElementById('card-remaining').innerText = `$${(incTotal - exTotal).toLocaleString()}`;
+    document.getElementById('card-remaining').innerText = `$${(totalIncome - exTotal).toLocaleString()}`;
+
+    // ====== Update Tables ======
     document.getElementById('expense-rows').innerHTML = dashExpHTML;
     document.getElementById('history-rows-manage').innerHTML = manageExpHTML;
-    document.getElementById('income-history-rows').innerHTML = incHTML;
+    document.getElementById('income-history-rows').innerHTML = incomeHTML;
+
+    // ====== Update Reports / Stats ======
+    if (currentUserRole === 'admin') {
+        const reportCount = document.getElementById('report-count');
+        const reportAvg = document.getElementById('report-avg');
+        if(reportCount) reportCount.innerText = transactionHistory.length + incomeHistory.length;
+        if(reportAvg) reportAvg.innerText = `$${(exTotal / (transactionHistory.length || 1)).toFixed(2)}`;
+    } else {
+        const saleCount = document.getElementById('sale-count-view');
+        if(saleCount) saleCount.innerText = transactionHistory.length + incomeHistory.length;
+    }
 }
 
 // Placeholder helper functions for UI
@@ -418,19 +465,7 @@ function deleteHistoryItem(index) {
         updateUI();
     }
 }
-/*
-function deleteSelectedRows() {
-    if (currentUserRole !== "admin") return;
-    const historyChecked = document.querySelectorAll('#history-rows-manage .row-checkbox:checked');
-    if (historyChecked.length > 0) {
-        if (confirm(`Delete ${historyChecked.length} records?`)) {
-            const indexes = Array.from(historyChecked).map(cb => parseInt(cb.dataset.index));
-            indexes.sort((a,b) => b-a).forEach(idx => transactionHistory.splice(idx, 1));
-            localStorage.setItem('coffee_history', JSON.stringify(transactionHistory));
-            updateUI();
-        }
-    }
-}*/
+
 function deleteSelectedRows() {
     // 1. Handle Saved History (Database)
     const historyChecked = document.querySelectorAll('#history-rows-manage .row-checkbox:checked');
@@ -500,19 +535,7 @@ function deleteIncomeItem(index) {
         updateUI();
     }
 }
-/*
-function deleteSelectedIncomeRows() {
-    if (currentUserRole !== "admin") return;
-    const historyChecked = document.querySelectorAll('#income-history-rows .income-row-checkbox:checked');
-    if (historyChecked.length > 0) {
-        if (confirm(`Delete ${historyChecked.length} income records?`)) {
-            const indexes = Array.from(historyChecked).map(cb => parseInt(cb.dataset.index));
-            indexes.sort((a,b) => b-a).forEach(idx => incomeHistory.splice(idx, 1));
-            localStorage.setItem('coffee_income_history', JSON.stringify(incomeHistory));
-            updateUI();
-        }
-    }
-}*/
+
 function deleteSelectedIncomeRows() {
     // 1. Handle Saved History (Database)
     const historyChecked = document.querySelectorAll('#income-history-rows .income-row-checkbox:checked');
@@ -541,65 +564,21 @@ function submitReport() {
 }
 
 // =======================
-// UPDATE UI FUNCTION
+// AUTO-LOGIN CHECK
 // =======================
-function updateUI() {
-    // ====== Expenses Processing ======
-    let exTotal = 0;
-    let dashExpHTML = "";
-    let manageExpHTML = "";
-    
-    transactionHistory.forEach((item, idx) => {
-        exTotal += item.amt;
-        dashExpHTML += `<tr><td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td>${item.payer}</td><td style="color:red">-$${item.amt.toLocaleString()}</td></tr>`;
-        manageExpHTML += `
-            <tr>
-                <td style="text-align:center"><input type="checkbox" class="row-checkbox" data-index="${idx}"></td>
-                <td>${item.desc}</td><td>${item.cat}</td><td>${item.date}</td><td>${item.payer}</td>
-                <td style="color:red">-$${item.amt.toLocaleString()}</td>
-                <td>${currentUserRole === 'admin' ? `<button class="delete-icon-btn" onclick="deleteHistoryItem(${idx})"><i class="fas fa-trash"></i></button>` : `<i class="fas fa-lock" style="color:#ccc"></i>`}</td>
-            </tr>
-        `;
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'logout') return;
 
-    // ====== Income Processing ======
-    let currentIncomeTotal = 0;
-    let incomeHTML = "";
-    
-    incomeHistory.forEach((item, idx) => {
-        currentIncomeTotal += item.amt;
-        incomeHTML += `
-            <tr>
-                <td style="text-align:center"><input type="checkbox" class="income-row-checkbox" data-index="${idx}"></td>
-                <td>${item.desc}</td><td>${item.source}</td><td>${item.date}</td><td>${item.receiver}</td>
-                <td style="color:green">+$${item.amt.toLocaleString()}</td>
-                <td>${currentUserRole === 'admin' ? `<button class="delete-icon-btn" onclick="deleteIncomeItem(${idx})"><i class="fas fa-trash"> </i></button>` : `<i class="fas fa-lock" style="color:#ccc"></i>`}</td>
-            </tr>
-        `;
-    });
-
-    // Update global total and storage
-    totalIncome = currentIncomeTotal;
-    localStorage.setItem('coffee_income_total', totalIncome);
-
-    // ====== Update Cards ======
-    document.getElementById('card-income').innerText = `$${totalIncome.toLocaleString()}`;
-    document.getElementById('card-total').innerText = `$${exTotal.toLocaleString()}`;
-    document.getElementById('card-remaining').innerText = `$${(totalIncome - exTotal).toLocaleString()}`;
-
-    // ====== Update Tables ======
-    document.getElementById('expense-rows').innerHTML = dashExpHTML;
-    document.getElementById('history-rows-manage').innerHTML = manageExpHTML;
-    document.getElementById('income-history-rows').innerHTML = incomeHTML;
-
-    // ====== Update Reports / Stats ======
-    if (currentUserRole === 'admin') {
-        const reportCount = document.getElementById('report-count');
-        const reportAvg = document.getElementById('report-avg');
-        if(reportCount) reportCount.innerText = transactionHistory.length + incomeHistory.length;
-        if(reportAvg) reportAvg.innerText = `$${(exTotal / (transactionHistory.length || 1)).toFixed(2)}`;
-    } else {
-        const saleCount = document.getElementById('sale-count-view');
-        if(saleCount) saleCount.innerText = transactionHistory.length + incomeHistory.length;
+    const savedRole = localStorage.getItem('coffee_user_role');
+    if (savedRole) {
+        currentUserRole = savedRole;
+        const roleName = savedRole === 'admin' ? 'Administrator' : 'Sale Person';
+        initSystem(roleName);
+        
+        if (window.location.hash) {
+            const section = window.location.hash.substring(1);
+            showSection(section);
+        }
     }
-}
+});
