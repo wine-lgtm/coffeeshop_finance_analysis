@@ -14,7 +14,7 @@ app.secret_key = 'supersecretkey'
 DB_NAME = "cafe_v2_db"
 REPORTING_DB_NAME = "coffeeshop_cashflow"
 DB_USER = "postgres"
-DB_PASSWORD = "postgresql"
+DB_PASSWORD = "postgres"
 DB_HOST = "localhost"
 
 def get_db_connection():
