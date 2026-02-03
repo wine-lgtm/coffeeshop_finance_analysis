@@ -67,6 +67,11 @@
     </div>
 
     <div id="dashboard-section" class="hidden">
+             
+   <div id="report-page" class="page-section">
+            <div class="report-container" id="report-content-area">
+                </div>
+        </div>
         
         <div id="dashboard" class="page-section active-section">
             <header class="dash-header">
@@ -94,23 +99,97 @@
             <header class="dash-header">
                 <h1>Manage Budget</h1>
             </header>
-            <div class="card">
-                <h3>Budget Overview</h3>
-                <p>Budget management features are currently under development.</p>
-                <div class="summary-card mocha-light" style="max-width: 300px; margin-top: 20px;">
-                    <h4>Current Budget</h4>
-                    <p>$1,000,000</p>
+            <div class="card-grid" style="display: flex; justify-content: space-between; gap: 20px;">
+                <div class="summary-card creamy-latte" style="cursor: pointer; padding: 40px; width: 48%; height: 200px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h4>Company Budget</h4>
+                        <p id="company-budget-total">$0</p>
+                    </div>
+              <button onclick="window.location.href='overall_budget.html'; event.stopPropagation();" 
+                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Budget
+        </button>
                 </div>
+                <div class="summary-card mocha-light" style="cursor: pointer; padding: 40px; width: 48%; height: 200px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h4>Category Budgets</h4>
+                        <p id="total-budget-amount">$0</p>
+                    </div>
+                <button onclick="window.location.href='category_budget.html'; event.stopPropagation();" 
+                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Budget
+        </button>
+                </div>
+            </div>
+
+            <div id="company-budget-section" class="manage-expense-card" style="display:none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 id="company-form-title">Add Company Budget</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="month" id="company_month_filter" onchange="loadCompanyBudgets()" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <button onclick="loadCompanyBudgets()" style="background: #2ea44f; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">Filter</button>
+                    </div>
+                </div>
+                <div class="expense-table-input">
+                    <input type="hidden" id="company_budget_id">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">MONTH</label>
+                            <input type="month" id="company_budget_month">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">TOTAL AMOUNT</label>
+                            <input type="number" id="company_budget_amount" placeholder="0.00">
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="saveCompanyBudget()" class="add-expense-btn" style="height: 42px;">Save</button>
+                            <button id="btn-cancel-edit-company" onclick="clearCompanyForm()" style="display: none; background: #999; color: white; border: none; padding: 0 15px; border-radius: 14px; cursor: pointer; height: 42px;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <h3 style="margin-top: 30px;">Company Budget List</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Total Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="company-budget-table-body"></tbody>
+                </table>
+            </div>
+
+            <div id="category-budget-section" class="manage-expense-card">
+                
+               
+                </div>
+
+                <h3 style="margin-top: 30px;">Budget List</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-table-body">
+                        <!-- Budget rows will be populated here -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <div id="report-page" class="page-section">
-            <div class="report-container" id="report-content-area">
-                </div>
-        </div>
+        
+ 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js"></script>
+    <script src="budget_script.js"></script>
+    <script src="budget.js"></script>
+    <script src="company_budget.js"></script>
     <script>
     function openCashEntry() {
         const role = localStorage.getItem('coffee_user_role') || 'sale';

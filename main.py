@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from fastapi import FastAPI, Query, HTTPException, Response
+from fastapi import FastAPI, Query, HTTPException, Response, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -11,6 +11,9 @@ from fastapi import Response
 from fpdf import FPDF
 import pandas as pd
 from sqlalchemy import text
+from pydantic import BaseModel
+from typing import Optional
+from budget_routes import router
 
 app = FastAPI(title="Coffee Shop Backend")
 
@@ -21,7 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/coffeeshop_cashflow"
+app.include_router(router)
+
+DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 
 # --- 1. GET DATE BOUNDS (Fixes the "Show all data from start" issue) ---
@@ -245,6 +250,7 @@ def download_pdf(start_date: str, end_date: str):
     except Exception as e:
         print(f"PDF Error: {e}")
         return {"error": str(e)}
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category Budget - Coffee Cashflow</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="side.css">
+</head>
+
+<body>
+    
+    <div id="dashboard-section">
+        
+        <div id="budget-page" class="page-section active-section">
+            <header class="dash-header">
+                <h1>Category Budget Management</h1>
+                <button onclick="window.location.href='index.html#budget-page'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget</button>
+            </header>
+            
+            <div id="category-budget-section" class="manage-expense-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 id="form-title">Add New Budget</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="month" id="budget_month_filter" onchange="loadBudgets()" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <button onclick="loadBudgets()" style="background: #2ea44f; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">Filter</button>
+                    </div>
+                </div>
+
+                <div class="expense-table-input">
+                    <input type="hidden" id="budget_id">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">MONTH</label>
+                            <input type="month" id="budget_month">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">CATEGORY</label>
+                            <input type="text" id="budget_category" placeholder="e.g. Marketing, Rent">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">AMOUNT</label>
+                            <input type="number" id="budget_amount" placeholder="0.00">
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="saveBudget()" class="add-expense-btn" style="height: 42px;">Save Budget</button>
+                            <button id="btn-cancel-edit" onclick="clearBudgetForm()" style="display: none; background: #999; color: white; border: none; padding: 0 15px; border-radius: 14px; cursor: pointer; height: 42px;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px;">Budget List</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-table-body">
+                        <!-- Budget rows will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="report-page" class="page-section">
+            <div class="report-container" id="report-content-area">
+                </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="newscript.js"></script>
+    <script src="budget.js"></script>
+    <script>
+        // Initialize the category budget page
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const monthStr = today.toISOString().slice(0, 7);
+            
+            const filterInput = document.getElementById('budget_month_filter');
+            const formMonthInput = document.getElementById('budget_month');
+
+            if (filterInput && !filterInput.value) {
+                filterInput.value = monthStr;
+            }
+            if (formMonthInput && !formMonthInput.value) {
+                formMonthInput.value = monthStr;
+            }
+
+            loadBudgets();
+        });
+    </script>
+</body>
+</html>
