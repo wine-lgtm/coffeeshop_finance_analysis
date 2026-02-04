@@ -8,6 +8,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="side.css">
+
+    <style>
+        /* Highlight main category (no sub-category) budget amount cells */
+        .main-budget-amount {
+            font-weight: 700;
+            background: #fff7cc;
+            color: #2c3e50;
+        }
+    </style>
 </head>
 
 <body>
@@ -31,7 +40,7 @@
 
                 <div class="expense-table-input">
                     <input type="hidden" id="budget_id">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">MONTH</label>
                             <input type="month" id="budget_month">
@@ -42,6 +51,12 @@
                                 <option value="">Select Category</option>
                                 <option value="COGS">COGS</option>
                                 <option value="Operating expense">Operating expense</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">SUB CATEGORY</label>
+                            <select id="budget_subcategory" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%;">
+                                <option value="">Select Sub Category</option>
                             </select>
                         </div>
                         <div>
@@ -67,6 +82,7 @@
                             <thead>
                                 <tr>
                                     <th>Month</th>
+                                    <th>Subcategory</th>
                                     <th>Amount</th>
                                     <th>Actions</th>
                                 </tr>
@@ -86,6 +102,7 @@
                             <thead>
                                 <tr>
                                     <th>Month</th>
+                                    <th>Subcategory</th>
                                     <th>Amount</th>
                                     <th>Actions</th>
                                 </tr>
@@ -124,6 +141,10 @@
             }
 
             loadBudgets();
+
+            if (typeof initBudgetForm === 'function') {
+                initBudgetForm();
+            }
         });
     </script>
 </body>
