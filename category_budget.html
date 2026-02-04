@@ -38,7 +38,11 @@
                         </div>
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">CATEGORY</label>
-                            <input type="text" id="budget_category" placeholder="e.g. Marketing, Rent">
+                            <select id="budget_category" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%;">
+                                <option value="">Select Category</option>
+                                <option value="COGS">COGS</option>
+                                <option value="Operating expense">Operating expense</option>
+                            </select>
                         </div>
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">AMOUNT</label>
@@ -52,19 +56,46 @@
                 </div>
 
                 <h3 style="margin-top: 30px;">Budget List</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Month</th>
-                            <th>Category</th>
-                            <th>Amount</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="budget-table-body">
-                        <!-- Budget rows will be populated here -->
-                    </tbody>
-                </table>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="color: #2c3e50; margin: 0;">COGS Budgets</h4>
+                            <div style="font-weight: bold; color: #27ae60;">Total: $<span id="cogs-total">0</span></div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cogs-budget-table-body">
+                                <!-- COGS budgets will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="color: #2c3e50; margin: 0;">Operating Expense Budgets</h4>
+                            <div style="font-weight: bold; color: #e74c3c;">Total: $<span id="operating-total">0</span></div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="operating-budget-table-body">
+                                <!-- Operating expense budgets will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
