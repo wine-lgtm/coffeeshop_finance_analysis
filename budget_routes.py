@@ -64,26 +64,257 @@ def get_budgets(month: Optional[str] = None):
 
 @router.post("/api/budgets")
 def create_budget(budget: BudgetModel):
-    query = text("""
-        INSERT INTO budgets (month, category, subcategory, amount)
-        VALUES (:month, :category, :subcategory, :amount)
-        RETURNING id
-    """)
     with engine.connect() as conn:
-        result = conn.execute(query, {"month": budget.month, "category": budget.category, "subcategory": budget.subcategory, "amount": budget.amount})
+        # Prevent duplicate budget for same month + category + subcategory
+        existing = conn.execute(
+            text(
+                """
+                SELECT id FROM budgets
+                WHERE month = :month
+                  AND category = :category
+                  AND (
+                        (subcategory IS NULL AND :subcategory IS NULL)
+                        OR subcategory = :subcategory
+                  )
+                """
+            ),
+            {
+                "month": budget.month,
+                "category": budget.category,
+                "subcategory": budget.subcategory,
+            },
+        ).fetchone()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="Budget already exists for this category and month",
+            )
+
+        # Budget hierarchy rules between main category and sub-categories
+        if budget.subcategory not in (None, ""):
+            # Sub-category: ensure total sub-category amount does not exceed main category (if any)
+            main_row = conn.execute(
+                text(
+                    """
+                    SELECT amount FROM budgets
+                    WHERE month = :month
+                      AND category = :category
+                      AND subcategory IS NULL
+                    """
+                ),
+                {
+                    "month": budget.month,
+                    "category": budget.category,
+                },
+            ).fetchone()
+
+            if main_row is not None:
+                main_amount = float(main_row[0])
+                sub_totals_row = conn.execute(
+                    text(
+                        """
+                        SELECT COALESCE(SUM(amount), 0) AS total
+                        FROM budgets
+                        WHERE month = :month
+                          AND category = :category
+                          AND subcategory IS NOT NULL
+                        """
+                    ),
+                    {
+                        "month": budget.month,
+                        "category": budget.category,
+                    },
+                ).mappings().one()
+
+                existing_sub_total = float(sub_totals_row["total"])
+                new_total = existing_sub_total + float(budget.amount)
+
+                if new_total > main_amount:
+                    formatted_main = f"{main_amount:,.0f}"
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"This sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
+                            f"Please increase the {budget.category} budget or reduce the sub-category amount."
+                        ),
+                    )
+        else:
+            # Main category: if sub-categories already exist, main must be >= sum of sub-categories
+            sub_totals_row = conn.execute(
+                text(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total
+                    FROM budgets
+                    WHERE month = :month
+                      AND category = :category
+                      AND subcategory IS NOT NULL
+                    """
+                ),
+                {
+                    "month": budget.month,
+                    "category": budget.category,
+                },
+            ).mappings().one()
+
+            existing_sub_total = float(sub_totals_row["total"])
+            if existing_sub_total > 0 and budget.amount < existing_sub_total:
+                formatted_sub = f"{existing_sub_total:,.0f}"
+                formatted_main = f"{budget.amount:,.0f}"
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Your sub-category budgets total ${formatted_sub}, which is higher than the {budget.category} budget of ${formatted_main}.\n"
+                        f"Please increase the {budget.category} budget or adjust the sub-category amounts."
+                    ),
+                )
+
+        query = text(
+            """
+            INSERT INTO budgets (month, category, subcategory, amount)
+            VALUES (:month, :category, :subcategory, :amount)
+            RETURNING id
+        """
+        )
+        result = conn.execute(
+            query,
+            {
+                "month": budget.month,
+                "category": budget.category,
+                "subcategory": budget.subcategory,
+                "amount": budget.amount,
+            },
+        )
         conn.commit()
         new_id = result.scalar()
     return {"id": new_id, "message": "Budget created successfully"}
 
 @router.put("/api/budgets/{budget_id}")
 def update_budget(budget_id: int, budget: BudgetModel):
-    query = text("""
-        UPDATE budgets
-        SET month = :month, category = :category, subcategory = :subcategory, amount = :amount
-        WHERE id = :id
-    """)
     with engine.connect() as conn:
-        result = conn.execute(query, {"month": budget.month, "category": budget.category, "subcategory": budget.subcategory, "amount": budget.amount, "id": budget_id})
+        # Prevent changing into a duplicate month + category + subcategory of another row
+        existing = conn.execute(
+            text(
+                """
+                SELECT id FROM budgets
+                WHERE month = :month
+                  AND category = :category
+                  AND (
+                        (subcategory IS NULL AND :subcategory IS NULL)
+                        OR subcategory = :subcategory
+                  )
+                  AND id <> :id
+                """
+            ),
+            {
+                "month": budget.month,
+                "category": budget.category,
+                "subcategory": budget.subcategory,
+                "id": budget_id,
+            },
+        ).fetchone()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="Budget already exists for this category and month",
+            )
+
+        # Budget hierarchy rules between main category and sub-categories
+        if budget.subcategory not in (None, ""):
+            # Sub-category: ensure total sub-category amount does not exceed main category (if any)
+            main_row = conn.execute(
+                text(
+                    """
+                    SELECT amount FROM budgets
+                    WHERE month = :month
+                      AND category = :category
+                      AND subcategory IS NULL
+                    """
+                ),
+                {
+                    "month": budget.month,
+                    "category": budget.category,
+                },
+            ).fetchone()
+
+            if main_row is not None:
+                main_amount = float(main_row[0])
+                sub_totals_row = conn.execute(
+                    text(
+                        """
+                        SELECT COALESCE(SUM(amount), 0) AS total
+                        FROM budgets
+                        WHERE month = :month
+                          AND category = :category
+                          AND subcategory IS NOT NULL
+                          AND id <> :id
+                        """
+                    ),
+                    {
+                        "month": budget.month,
+                        "category": budget.category,
+                        "id": budget_id,
+                    },
+                ).mappings().one()
+
+                existing_sub_total = float(sub_totals_row["total"])
+                new_total = existing_sub_total + float(budget.amount)
+
+                if new_total > main_amount:
+                    formatted_main = f"{main_amount:,.0f}"
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"This sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
+                            f"Please increase the {budget.category} budget or reduce the sub-category amount."
+                        ),
+                    )
+        else:
+            # Main category: if sub-categories already exist, main must be >= sum of sub-categories
+            sub_totals_row = conn.execute(
+                text(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total
+                    FROM budgets
+                    WHERE month = :month
+                      AND category = :category
+                      AND subcategory IS NOT NULL
+                    """
+                ),
+                {
+                    "month": budget.month,
+                    "category": budget.category,
+                },
+            ).mappings().one()
+
+            existing_sub_total = float(sub_totals_row["total"])
+            if existing_sub_total > 0 and budget.amount < existing_sub_total:
+                formatted_sub = f"{existing_sub_total:,.0f}"
+                formatted_main = f"{budget.amount:,.0f}"
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Your sub-category budgets total ${formatted_sub}, which is higher than the {budget.category} budget of ${formatted_main}.\n"
+                        f"Please increase the {budget.category} budget or adjust the sub-category amounts."
+                    ),
+                )
+
+        query = text(
+            """
+            UPDATE budgets
+            SET month = :month, category = :category, subcategory = :subcategory, amount = :amount
+            WHERE id = :id
+        """
+        )
+        result = conn.execute(
+            query,
+            {
+                "month": budget.month,
+                "category": budget.category,
+                "subcategory": budget.subcategory,
+                "amount": budget.amount,
+                "id": budget_id,
+            },
+        )
         conn.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Budget not found")
