@@ -9,21 +9,32 @@ async function loadBudgets() {
     try {
         const response = await fetch(url);
         const budgets = await response.json();
-        renderBudgetTable(budgets);
-        updateBudgetSummary(budgets);
+        
+        // Filter budgets by category
+        const cogsBudgets = budgets.filter(b => b.category === 'COGS');
+        const operatingBudgets = budgets.filter(b => b.category === 'Operating expense');
+        
+        // Render separate tables
+        renderBudgetTable(cogsBudgets, 'cogs-budget-table-body');
+        renderBudgetTable(operatingBudgets, 'operating-budget-table-body');
+        
+        // Update summaries
+        updateBudgetSummary(cogsBudgets, 'cogs-total');
+        updateBudgetSummary(operatingBudgets, 'operating-total');
     } catch (error) {
         console.error('Error loading budgets:', error);
     }
 }
 
-function renderBudgetTable(budgets) {
-    const tbody = document.getElementById('budget-table-body');
+function renderBudgetTable(budgets, tableBodyId) {
+    const tbody = document.getElementById(tableBodyId);
     if (!tbody) return;
     
     tbody.innerHTML = '';
 
     if (budgets.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No budgets found for this month</td></tr>';
+        const colspan = '3';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">No budgets found for this month</td></tr>`;
         return;
     }
 
@@ -31,7 +42,6 @@ function renderBudgetTable(budgets) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${budget.month}</td>
-            <td>${budget.category}</td>
             <td>$${parseFloat(budget.amount).toLocaleString()}</td>
             <td>
                 <button onclick="editBudget(${budget.id}, '${budget.month}', '${budget.category}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
@@ -42,11 +52,11 @@ function renderBudgetTable(budgets) {
     });
 }
 
-function updateBudgetSummary(budgets) {
+function updateBudgetSummary(budgets, totalElementId) {
     const total = budgets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
-    const totalEl = document.getElementById('total-budget-amount');
+    const totalEl = document.getElementById(totalElementId);
     if (totalEl) {
-        totalEl.innerText = `$${total.toLocaleString()}`;
+        totalEl.innerText = total.toLocaleString();
     }
 }
 
@@ -121,31 +131,4 @@ function clearBudgetForm() {
     document.getElementById('btn-cancel-edit').style.display = 'none';
 }
 
-// Attach event listener when section is shown
-function initBudgetPage() {
-    const today = new Date();
-    const monthStr = today.toISOString().slice(0, 7);
-    
-    const filterInput = document.getElementById('budget_month_filter');
-    const formMonthInput = document.getElementById('budget_month');
 
-    if (filterInput && !filterInput.value) {
-        filterInput.value = monthStr;
-    }
-    if (formMonthInput && !formMonthInput.value) {
-        formMonthInput.value = monthStr;
-    }
-
-    loadBudgets();
-    loadCompanyBudgets();
-}
-
-function showCompanyBudget() {
-    document.getElementById('company-budget-section').style.display = 'block';
-    document.getElementById('category-budget-section').style.display = 'none';
-}
-
-function showCategoryBudget() {
-    document.getElementById('company-budget-section').style.display = 'none';
-    document.getElementById('category-budget-section').style.display = 'block';
-}
