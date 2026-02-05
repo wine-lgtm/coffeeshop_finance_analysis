@@ -31,10 +31,14 @@ try:
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS overall_budgets (
                 id SERIAL PRIMARY KEY,
-                month TEXT NOT NULL,
-                amount NUMERIC(12,2) NOT NULL
+                month TEXT,
+                amount NUMERIC(12,2),
+                description TEXT
             )
         """))
+        # Ensure columns exist even if table was created with an older structure
+        conn.execute(text("ALTER TABLE overall_budgets ADD COLUMN IF NOT EXISTS month TEXT"))
+        conn.execute(text("ALTER TABLE overall_budgets ADD COLUMN IF NOT EXISTS description TEXT"))
         conn.commit()
         print("Budget tables created successfully")
 except Exception as e:
@@ -391,6 +395,7 @@ def delete_company_budget(budget_id: int):
 class OverallBudgetModel(BaseModel):
     month: str
     amount: float
+    description: Optional[str] = None
 
 @router.get("/api/overall_budgets")
 def get_overall_budgets(month: Optional[str] = None):
@@ -415,24 +420,37 @@ def create_overall_budget(budget: OverallBudgetModel):
         
         # Insert new budget
         query = text("""
-            INSERT INTO overall_budgets (month, amount)
-            VALUES (:month, :amount)
+            INSERT INTO overall_budgets (month, amount, description)
+            VALUES (:month, :amount, :description)
             RETURNING id
         """)
-        result = conn.execute(query, {"month": budget.month, "amount": budget.amount})
+        result = conn.execute(
+            query,
+            {"month": budget.month, "amount": budget.amount, "description": budget.description},
+        )
         conn.commit()
         new_id = result.scalar()
     return {"id": new_id, "message": "Overall budget created successfully"}
 
 @router.put("/api/overall_budgets/{budget_id}")
 def update_overall_budget(budget_id: int, budget: OverallBudgetModel):
-    query = text("""
+    query = text(
+        """
         UPDATE overall_budgets
-        SET month = :month, amount = :amount
+        SET month = :month, amount = :amount, description = :description
         WHERE id = :id
-    """)
+    """
+    )
     with engine.connect() as conn:
-        result = conn.execute(query, {"month": budget.month, "amount": budget.amount, "id": budget_id})
+        result = conn.execute(
+            query,
+            {
+                "month": budget.month,
+                "amount": budget.amount,
+                "description": budget.description,
+                "id": budget_id,
+            },
+        )
         conn.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Overall budget not found")
