@@ -17,6 +17,10 @@
         <div id="budget-page" class="page-section active-section">
             <header class="dash-header">
                 <h1>Company Overall Budget Management (Monthly)</h1>
+                <button onclick="window.location.href='category_budget.html'; event.stopPropagation();" 
+                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Category Budget
+        </button>
                 <button onclick="window.location.href='index.html#budget-page'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget</button>
             </header>
             
@@ -31,16 +35,20 @@
 
                 <div class="expense-table-input">
                     <input type="hidden" id="overall_budget_id">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr auto; gap: 15px; align-items: end;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">MONTH</label>
                             <input type="month" id="overall_budget_month">
                         </div>
-                       <div>
+                        <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">AMOUNT</label>
                             <input type="number" id="overall_budget_amount" placeholder="0.00">
                         </div>
-                                                <div style="display: flex; gap: 5px;">
+                        <div>
+                            <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">DESCRIPTION</label>
+                            <input type="text" id="overall_budget_description" placeholder="e.g. Company total budget">
+                        </div>
+                        <div style="display: flex; gap: 5px;">
                             <button onclick="saveOverallBudget()" class="add-expense-btn" style="height: 42px;">Save Budget</button>
                             <button id="btn-cancel-edit-overall" onclick="clearOverallForm()" style="display: none; background: #999; color: white; border: none; padding: 0 15px; border-radius: 14px; cursor: pointer; height: 42px;">Cancel</button>
                         </div>
@@ -53,6 +61,7 @@
                         <tr>
                             <th>Month</th>
                             <th>Amount</th>
+                            <th>Description</th>
                             <th>Actions</th>
                         </tr>
                     </thead>

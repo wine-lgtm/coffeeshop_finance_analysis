@@ -21,7 +21,7 @@ function renderOverallBudgetTable(budgets) {
     tbody.innerHTML = '';
 
     if (budgets.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No overall budgets found for this month</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No overall budgets found for this month</td></tr>';
         return;
     }
 
@@ -30,8 +30,9 @@ function renderOverallBudgetTable(budgets) {
         tr.innerHTML = `
             <td>${budget.month}</td>
             <td>$${parseFloat(budget.amount).toLocaleString()}</td>
+            <td>${budget.description || ''}</td>
             <td>
-                <button onclick="editOverallBudget(${budget.id}, '${budget.month}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
+                <button onclick="editOverallBudget(${budget.id}, '${budget.month}', ${budget.amount}, ${budget.description ? `'${String(budget.description).replace(/'/g, "\\'")}'` : 'null'})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteOverallBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class="fas fa-trash"></i></button>
             </td>
         `;
@@ -43,13 +44,15 @@ async function saveOverallBudget() {
     const id = document.getElementById('overall_budget_id').value;
     const month = document.getElementById('overall_budget_month').value;
     const amount = document.getElementById('overall_budget_amount').value;
+    const description = document.getElementById('overall_budget_description').value;
+    const filterInput = document.getElementById('overall_month_filter');
 
     if (!month || !amount) {
         alert('Please fill month and amount');
         return;
     }
 
-    const data = { month, amount: parseFloat(amount) };
+    const data = { month, amount: parseFloat(amount), description: description || null };
     const url = id ? `http://127.0.0.1:8000/api/overall_budgets/${id}` : 'http://127.0.0.1:8000/api/overall_budgets';
     const method = id ? 'PUT' : 'POST';
 
@@ -63,6 +66,10 @@ async function saveOverallBudget() {
         if (response.ok) {
             alert('Overall budget saved successfully!');
             clearOverallForm();
+            // Show the month we just saved in the table
+            if (filterInput) {
+                filterInput.value = month;
+            }
             loadOverallBudgets();
         } else {
             const error = await response.json();
@@ -92,10 +99,14 @@ async function deleteOverallBudget(id) {
     }
 }
 
-function editOverallBudget(id, month, amount) {
+function editOverallBudget(id, month, amount, description) {
     document.getElementById('overall_budget_id').value = id;
     document.getElementById('overall_budget_month').value = month;
     document.getElementById('overall_budget_amount').value = amount;
+    const descInput = document.getElementById('overall_budget_description');
+    if (descInput) {
+        descInput.value = description || '';
+    }
     document.getElementById('form-title').innerText = 'Edit Monthly Overall Budget';
     document.getElementById('btn-cancel-edit-overall').style.display = 'inline-block';
 }
@@ -104,6 +115,10 @@ function clearOverallForm() {
     document.getElementById('overall_budget_id').value = '';
     document.getElementById('overall_budget_month').value = '';
     document.getElementById('overall_budget_amount').value = '';
+    const descInput = document.getElementById('overall_budget_description');
+    if (descInput) {
+        descInput.value = '';
+    }
     document.getElementById('form-title').innerText = 'Add New Monthly Overall Budget';
     document.getElementById('btn-cancel-edit-overall').style.display = 'none';
 }
