@@ -36,6 +36,10 @@
         <div id="budget-page" class="page-section active-section">
             <header class="dash-header">
                 <h1>Category Budget Management</h1>
+                <button onclick="window.location.href='overall_budget.html'; event.stopPropagation();" 
+                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Overall Budget
+        </button>
                 <button onclick="window.location.href='index.html#budget-page'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget</button>
             </header>
             
@@ -133,7 +137,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js"></script>
-    <script src="budget.js"></script>
+    <script src="budget.js?v=2"></script>
     <script>
         // Initialize the category budget page
         document.addEventListener('DOMContentLoaded', function() {
