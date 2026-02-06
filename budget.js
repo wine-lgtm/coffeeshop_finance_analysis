@@ -244,7 +244,7 @@ async function saveBudget() {
                 const error = await response.json();
                 alert(error.detail || 'Error saving budget');
             } catch (e) {
-                alert('Error saving budget');
+            alert('Error saving budget');
             }
         }
     } catch (error) {

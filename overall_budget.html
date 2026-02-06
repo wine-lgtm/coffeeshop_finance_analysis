@@ -8,6 +8,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="side.css">
+    <style>
+        /* Faded / disabled look when month is outside allowed range (like category budget: not-allowed months appear greyed) */
+        input[id="overall_budget_month"].month-out-of-range,
+        input[id="overall_month_filter"].month-out-of-range {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+            color: #6c757d;
+            opacity: 0.8;
+        }
+        #overall_budget_month{
+
+            background-color: #d4edda;
+    border: 1px solid #28a745;
+    color: #155724;
+        }
+        #overall_month_filter{
+            background-color: #d4edda;
+    border: 1px solid #28a745;
+    color: #155724; 
+        }
+
+  
+    </style>
 </head>
 
 <body>
@@ -27,8 +50,8 @@
             <div id="category-budget-section" class="manage-expense-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 id="form-title">Add New Monthly Overall Budget</h3>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="month" id="overall_month_filter" onchange="loadOverallBudgets()" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="month" id="overall_month_filter" onchange="loadOverallBudgets()" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;" title="Only current month through next 3 months" min="" max="">
                         <button onclick="loadOverallBudgets()" style="background: #2ea44f; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">Filter</button>
                     </div>
                 </div>
@@ -38,7 +61,8 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr auto; gap: 15px; align-items: end;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">MONTH</label>
-                            <input type="month" id="overall_budget_month">
+                            <input type="month" id="overall_budget_month" title="Only current month through next 3 months can be selected" min="" max="">
+                            
                         </div>
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">AMOUNT</label>
@@ -79,25 +103,51 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js"></script>
-    <script src="overall_budget.js"></script>
     <script>
-        // Initialize the overall budget page
+        // Inline: set month limits so they work even when page is served by backend (no dependency on overall_budget.js load)
+        (function() {
+            function getRange() {
+                var now = new Date();
+                var current = new Date(now.getFullYear(), now.getMonth(), 1);
+                var max = new Date(now.getFullYear(), now.getMonth() + 3, 1);
+                var toStr = function(d) {
+                    var y = d.getFullYear(), m = d.getMonth() + 1;
+                    return y + '-' + (m < 10 ? '0' : '') + m;
+                };
+                return { currentMonth: toStr(current), maxMonth: toStr(max) };
+            }
+            function applyLimits() {
+                var r = getRange();
+                var formMonth = document.getElementById('overall_budget_month');
+                var filterMonth = document.getElementById('overall_month_filter');
+                if (formMonth) { formMonth.min = r.currentMonth; formMonth.max = r.maxMonth; if (!formMonth.value) formMonth.value = r.currentMonth; }
+                if (filterMonth) { filterMonth.min = r.currentMonth; filterMonth.max = r.maxMonth; if (!filterMonth.value) filterMonth.value = r.currentMonth; }
+                var hint = document.getElementById('overall_month_hint');
+
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyLimits);
+            } else {
+                applyLimits();
+            }
+        })();
+    </script>
+
+            <script src="overall_budget.js?v=2"></script>
+    <script>
+        // Inline: sync filter and table when form month changes (works even if overall_budget.js is cached on localhost)
         document.addEventListener('DOMContentLoaded', function() {
-            const today = new Date();
-            const monthStr = today.toISOString().slice(0, 7);
-            
-            const filterInput = document.getElementById('overall_month_filter');
-            const formMonthInput = document.getElementById('overall_budget_month');
-
-            if (filterInput && !filterInput.value) {
-                filterInput.value = monthStr;
-            }
-            if (formMonthInput && !formMonthInput.value) {
-                formMonthInput.value = monthStr;
-            }
-
-            loadOverallBudgets();
+            var formMonth = document.getElementById('overall_budget_month');
+            var filterInput = document.getElementById('overall_month_filter');
+            if (!formMonth || !filterInput) return;
+            formMonth.addEventListener('change', function() {
+                var month = formMonth.value;
+                if (!month) return;
+                filterInput.value = month;
+                if (typeof loadOverallBudgets === 'function') loadOverallBudgets();
+            });
         });
+    </script>
     </script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+from datetime import date
 from fastapi import APIRouter, Query, HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -5,6 +6,22 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter()
+
+
+def get_overall_budget_month_range():
+    """Allowed months: current month through next 3 months (no past, no beyond)."""
+    today = date.today()
+    current_first = date(today.year, today.month, 1)
+    # max month: +3 months from current
+    y, m = today.year, today.month
+    m += 3
+    if m > 12:
+        m -= 12
+        y += 1
+    max_first = date(y, m, 1)
+    min_str = current_first.strftime("%Y-%m")
+    max_str = max_first.strftime("%Y-%m")
+    return min_str, max_str
 
 DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
@@ -412,6 +429,12 @@ def get_overall_budgets(month: Optional[str] = None):
 
 @router.post("/api/overall_budgets")
 def create_overall_budget(budget: OverallBudgetModel):
+    min_month, max_month = get_overall_budget_month_range()
+    if not (min_month <= budget.month <= max_month):
+        raise HTTPException(
+            status_code=400,
+            detail=f"You can only set budgets from {min_month} up to {max_month}. Past and future months are not allowed.",
+        )
     with engine.connect() as conn:
         # Check if budget already exists for this month
         existing = conn.execute(text("SELECT id FROM overall_budgets WHERE month = :month"), {"month": budget.month}).fetchone()
@@ -434,6 +457,12 @@ def create_overall_budget(budget: OverallBudgetModel):
 
 @router.put("/api/overall_budgets/{budget_id}")
 def update_overall_budget(budget_id: int, budget: OverallBudgetModel):
+    min_month, max_month = get_overall_budget_month_range()
+    if not (min_month <= budget.month <= max_month):
+        raise HTTPException(
+            status_code=400,
+            detail=f"You can only set budgets from {min_month} up to {max_month}. Past and future months are not allowed.",
+        )
     query = text(
         """
         UPDATE overall_budgets
