@@ -1,3 +1,62 @@
+// Limit months: current month through next 3 months (same as budget.js — no past months, no beyond 3 months)
+function getAllowedMonthRange() {
+    const now = new Date();
+    const current = new Date(now.getFullYear(), now.getMonth(), 1);
+    const max = new Date(now.getFullYear(), now.getMonth() + 3, 1);
+    const toMonthStr = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        return `${y}-${m}`;
+    };
+    return {
+        currentMonth: toMonthStr(current),
+        maxMonth: toMonthStr(max)
+    };
+}
+
+function applyMonthLimits(input) {
+    if (!input) return;
+    const { currentMonth, maxMonth } = getAllowedMonthRange();
+    input.min = currentMonth;
+    input.max = maxMonth;
+}
+
+function isMonthWithinAllowedRange(monthStr) {
+    if (!monthStr) return false;
+    const { currentMonth, maxMonth } = getAllowedMonthRange();
+    return monthStr >= currentMonth && monthStr <= maxMonth;
+}
+
+function updateMonthInputStyle(input) {
+    if (!input) return;
+    const value = input.value;
+    if (!value) {
+        input.classList.remove('month-out-of-range');
+        return;
+    }
+    if (isMonthWithinAllowedRange(value)) {
+        input.classList.remove('month-out-of-range');
+    } else {
+        input.classList.add('month-out-of-range');
+    }
+}
+
+// Enforce allowed range: if value is out of range, clear it so disallowed months cannot be filled
+function enforceMonthRange(input, fallbackToCurrent) {
+    if (!input) return;
+    const value = input.value;
+    if (!value) return;
+    if (!isMonthWithinAllowedRange(value)) {
+        const { currentMonth, maxMonth } = getAllowedMonthRange();
+        input.value = fallbackToCurrent ? currentMonth : '';
+        updateMonthInputStyle(input);
+        input.setCustomValidity('');
+        if (fallbackToCurrent) {
+            alert(`Only months from ${currentMonth} to ${maxMonth} are allowed. Value was reset.`);
+        }
+    }
+}
+
 async function loadOverallBudgets() {
     const month = document.getElementById('overall_month_filter').value;
     let url = 'http://127.0.0.1:8000/api/overall_budgets';
@@ -52,6 +111,13 @@ async function saveOverallBudget() {
         return;
     }
 
+    // Block past months and months beyond next 3 (for both new and update)
+    if (!isMonthWithinAllowedRange(month)) {
+        const { currentMonth, maxMonth } = getAllowedMonthRange();
+        alert(`You can only set budgets from ${currentMonth} up to ${maxMonth}. Past and future months are not allowed.`);
+        return;
+    }
+
     const data = { month, amount: parseFloat(amount), description: description || null };
     const url = id ? `http://127.0.0.1:8000/api/overall_budgets/${id}` : 'http://127.0.0.1:8000/api/overall_budgets';
     const method = id ? 'PUT' : 'POST';
@@ -101,7 +167,11 @@ async function deleteOverallBudget(id) {
 
 function editOverallBudget(id, month, amount, description) {
     document.getElementById('overall_budget_id').value = id;
-    document.getElementById('overall_budget_month').value = month;
+    const monthInput = document.getElementById('overall_budget_month');
+    // Allow showing past month when editing (otherwise min/max would hide it)
+    monthInput.removeAttribute('min');
+    monthInput.removeAttribute('max');
+    monthInput.value = month;
     document.getElementById('overall_budget_amount').value = amount;
     const descInput = document.getElementById('overall_budget_description');
     if (descInput) {
@@ -113,7 +183,9 @@ function editOverallBudget(id, month, amount, description) {
 
 function clearOverallForm() {
     document.getElementById('overall_budget_id').value = '';
-    document.getElementById('overall_budget_month').value = '';
+    const monthInput = document.getElementById('overall_budget_month');
+    monthInput.value = '';
+    applyMonthLimits(monthInput); // restore next-3-months limit for new entry
     document.getElementById('overall_budget_amount').value = '';
     const descInput = document.getElementById('overall_budget_description');
     if (descInput) {
@@ -125,17 +197,60 @@ function clearOverallForm() {
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
-    const today = new Date();
-    const monthStr = today.toISOString().slice(0, 7);
-    
+    const { currentMonth } = getAllowedMonthRange();
+
     const filterInput = document.getElementById('overall_month_filter');
     const formMonthInput = document.getElementById('overall_budget_month');
 
+    applyMonthLimits(filterInput);
+    applyMonthLimits(formMonthInput);
+
     if (filterInput && !filterInput.value) {
-        filterInput.value = monthStr;
+        filterInput.value = currentMonth;
     }
     if (formMonthInput && !formMonthInput.value) {
-        formMonthInput.value = monthStr;
+        formMonthInput.value = currentMonth;
+    }
+
+    updateMonthInputStyle(formMonthInput);
+    updateMonthInputStyle(filterInput);
+
+    var hintEl = document.getElementById('overall_month_hint');
+    if (hintEl) {
+        hintEl.textContent = 'Allowed: ' + currentMonth + ' to ' + getAllowedMonthRange().maxMonth + ' (current month through next 3 months)';
+    }
+
+    if (formMonthInput) {
+        formMonthInput.addEventListener('change', function() {
+            // Disallowed months cannot be filled: reset to current month if out of range
+            enforceMonthRange(formMonthInput, true);
+            updateMonthInputStyle(formMonthInput);
+            if (isMonthWithinAllowedRange(formMonthInput.value)) {
+                formMonthInput.setCustomValidity('');
+                // Sync filter and table to selected month (like budget.js)
+                if (filterInput) {
+                    filterInput.value = formMonthInput.value;
+                    loadOverallBudgets();
+                }
+            }
+        });
+        formMonthInput.addEventListener('input', function() {
+            updateMonthInputStyle(formMonthInput);
+        });
+        formMonthInput.addEventListener('blur', function() {
+            enforceMonthRange(formMonthInput, true);
+            if (isMonthWithinAllowedRange(formMonthInput.value) && filterInput) {
+                filterInput.value = formMonthInput.value;
+                loadOverallBudgets();
+            }
+        });
+    }
+    if (filterInput) {
+        filterInput.addEventListener('change', function() {
+            enforceMonthRange(filterInput, true);
+            updateMonthInputStyle(filterInput);
+            loadOverallBudgets();
+        });
     }
 
     loadOverallBudgets();
