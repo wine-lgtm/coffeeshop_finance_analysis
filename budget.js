@@ -205,7 +205,10 @@ function renderBudgetTable(budgets, tableBodyId) {
 }
 
 function updateBudgetSummary(budgets, totalElementId) {
-    const total = budgets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+    // Only sum sub-category budgets (exclude main category rows where subcategory is null/empty)
+    const total = budgets
+        .filter(b => b.subcategory !== null && b.subcategory !== undefined && String(b.subcategory).trim() !== '')
+        .reduce((sum, b) => sum + parseFloat(b.amount), 0);
     const totalEl = document.getElementById(totalElementId);
     if (totalEl) {
         totalEl.innerText = total.toLocaleString();
