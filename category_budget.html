@@ -10,6 +10,13 @@
     <link rel="stylesheet" href="side.css">
 
     <style>
+        /* Page-specific override: hide the global sidebar when this page is opened directly */
+        .sidebar { display: none !important; }
+        /* Reset dashboard margin so content uses full width */
+        #dashboard-section { margin-left: 0 !important; padding: 40px; }
+    </style>
+
+    <style>
         /* Highlight main category (no sub-category) budget amount cells */
         .main-budget-amount {
             font-weight: 700;
@@ -40,7 +47,7 @@
                 style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
             Manage Overall Budget
         </button>
-                <button onclick="window.location.href='index.html#budget-page'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget</button>
+                <button onclick="window.location.href='budget_section.html'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
             <div id="category-budget-section" class="manage-expense-card">
@@ -90,7 +97,7 @@
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h4 style="color: #2c3e50; margin: 0;">COGS Budgets</h4>
-                            <div style="font-weight: bold; color: #27ae60;">Total: $<span id="cogs-total">0</span></div>
+                            <div style="font-weight: bold; color: #27ae60;">Total of Subcategory: $<span id="cogs-total">0</span></div>
                         </div>
                         <table>
                             <thead>
@@ -110,7 +117,7 @@
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h4 style="color: #2c3e50; margin: 0;">Operating Expense Budgets</h4>
-                            <div style="font-weight: bold; color: #e74c3c;">Total: $<span id="operating-total">0</span></div>
+                            <div style="font-weight: bold; color: #4ae73c;">Total of Subcategory: $<span id="operating-total">0</span></div>
                         </div>
                         <table>
                             <thead>
@@ -160,6 +167,46 @@
                 initBudgetForm();
             }
         });
+    </script>
+    <script>
+        // If this page is opened inside another same-origin page, hide the parent's sidebar
+        // while this page is active, and restore it when this page unloads.
+        (function(){
+            try {
+                if (window.top && window.top !== window) {
+                    const parentDoc = window.top.document;
+                    const sidebar = parentDoc.querySelector('.sidebar');
+                    const dashboard = parentDoc.querySelector('#dashboard-section');
+                    if (sidebar) {
+                        // save current inline styles so we can restore them
+                        sidebar.dataset._prevDisplay = sidebar.style.display || '';
+                        sidebar.style.display = 'none';
+                    }
+                    if (dashboard) {
+                        dashboard.dataset._prevMargin = dashboard.style.marginLeft || '';
+                        dashboard.style.marginLeft = '0';
+                    }
+
+                    // Restore on unload/navigation away
+                    window.addEventListener('beforeunload', function() {
+                        try {
+                            if (sidebar) {
+                                sidebar.style.display = sidebar.dataset._prevDisplay || '';
+                                delete sidebar.dataset._prevDisplay;
+                            }
+                            if (dashboard) {
+                                dashboard.style.marginLeft = dashboard.dataset._prevMargin || '';
+                                delete dashboard.dataset._prevMargin;
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                    });
+                }
+            } catch (e) {
+                // cross-origin or other access error; nothing to do
+            }
+        })();
     </script>
 </body>
 </html>

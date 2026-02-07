@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Budget</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="side.css">
+
+    <!-- FINAL layout fix -->
+    <style>
+        #budget-page-standalone {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 30px;
+            box-sizing: border-box;
+            display: block;
+        }
+
+        #budget-page-standalone table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #budget-page-standalone th,
+        #budget-page-standalone td {
+            padding: 12px 14px;
+            text-align: left;
+        }
+
+        #budget-page-standalone .card-grid {
+            width: 100%;
+        }
+
+        #budget-page-standalone .summary-card {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div id="budget-page-standalone">
+
+    <header class="dash-header">
+        <h1>Manage Budget</h1>
+    </header>
+
+    <!-- SUMMARY CARDS -->
+    <div class="card-grid" style="display:flex; justify-content:space-between; gap:20px;">
+        <div class="summary-card creamy-latte"
+             style="cursor:pointer; padding:40px; width:48%; height:200px;
+                    display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <h4>Company Budget</h4>
+                <p id="company-budget-total">$0</p>
+            </div>
+            <button onclick="location.href='overall_budget.html'"
+                    style="background:#2ea44f; color:white; border:none;
+                           padding:10px 20px; border-radius:5px; cursor:pointer; align-self:center;">
+                Manage Budget
+            </button>
+        </div>
+
+        <div class="summary-card mocha-light"
+             style="cursor:pointer; padding:40px; width:48%; height:200px;
+                    display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <h4>Category Budgets</h4>
+                <p id="total-budget-amount">$0</p>
+            </div>
+            <button onclick="window.location.href='category_budget.html'"
+                    style="background:#2ea44f; color:white; border:none;
+                           padding:10px 20px; border-radius:5px; cursor:pointer; align-self:center;">
+                Manage Budget
+            </button>
+        </div>
+    </div>
+
+    <!-- COMPANY BUDGET SECTION -->
+    <div id="company-budget-section" class="manage-expense-card" style="display:none; margin-top:30px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 id="company-form-title">Add Company Budget</h3>
+            <div style="display:flex; gap:10px;">
+                <input type="month" id="company_month_filter">
+                <button onclick="loadCompanyBudgets()" class="add-expense-btn">Filter</button>
+            </div>
+        </div>
+
+        <input type="hidden" id="company_budget_id">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:15px;">
+            <input type="month" id="company_budget_month">
+            <input type="number" id="company_budget_amount" placeholder="0.00">
+            <div style="display:flex; gap:5px;">
+                <button onclick="saveCompanyBudget()" class="add-expense-btn">Save</button>
+                <button onclick="clearCompanyForm()" id="btn-cancel-edit-company"
+                        style="display:none; background:#999; color:white; border:none;
+                               padding:0 15px; border-radius:14px;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
+        <h3 style="margin-top:30px;">Company Budget List</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Total Amount</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="company-budget-table-body"></tbody>
+        </table>
+    </div>
+
+    <!-- GENERAL BUDGET LIST -->
+    <h3 style="margin-top:40px;">Budget List</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Month</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="budget-table-body"></tbody>
+    </table>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="newscript.js"></script>
+<script src="budget_script.js"></script>
+<script src="budget.js"></script>
+<script src="company_budget.js"></script>
+
+</body>
+</html>

@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="side.css">
     <style>
+        /* Page-specific override: hide the global sidebar when this page is opened directly */
+        .sidebar { display: none !important; }
+        /* Reset dashboard margin so content uses full width */
+        #dashboard-section { margin-left: 0 !important; padding: 40px; }
+
+    </style>
+    <style>
         /* Faded / disabled look when month is outside allowed range (like category budget: not-allowed months appear greyed) */
         input[id="overall_budget_month"].month-out-of-range,
         input[id="overall_month_filter"].month-out-of-range {
@@ -45,7 +52,7 @@
             Manage Category Budget
         </button>
 
-                <button onclick="window.location.href='index.html#budget-page'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget</button>
+                 <button onclick="window.location.href='budget_section.html'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
             <div id="category-budget-section" class="manage-expense-card">
@@ -149,6 +156,44 @@
                 if (typeof loadOverallBudgets === 'function') loadOverallBudgets();
             });
         });
+    </script>
+    <script>
+        // If this page is opened inside another same-origin page, hide the parent's sidebar
+        // while this page is active, and restore it when this page unloads.
+        (function(){
+            try {
+                if (window.top && window.top !== window) {
+                    const parentDoc = window.top.document;
+                    const sidebar = parentDoc.querySelector('.sidebar');
+                    const dashboard = parentDoc.querySelector('#dashboard-section');
+                    if (sidebar) {
+                        sidebar.dataset._prevDisplay = sidebar.style.display || '';
+                        sidebar.style.display = 'none';
+                    }
+                    if (dashboard) {
+                        dashboard.dataset._prevMargin = dashboard.style.marginLeft || '';
+                        dashboard.style.marginLeft = '0';
+                    }
+
+                    window.addEventListener('beforeunload', function() {
+                        try {
+                            if (sidebar) {
+                                sidebar.style.display = sidebar.dataset._prevDisplay || '';
+                                delete sidebar.dataset._prevDisplay;
+                            }
+                            if (dashboard) {
+                                dashboard.style.marginLeft = dashboard.dataset._prevMargin || '';
+                                delete dashboard.dataset._prevMargin;
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                    });
+                }
+            } catch (e) {
+                // cross-origin or other access error; nothing to do
+            }
+        })();
     </script>
     </script>
 </body>
