@@ -1,0 +1,69 @@
+2026-02-03 19:27:45 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 19:27:45 +0630 HINT:  Future log output will appear in directory "log".
+^C2026-02-03 19:36:44 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 19:36:44 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 19:53:28 +0630 FATAL:  could not create lock file "postmaster.pid": Permission denied
+2026-02-03 19:54:11 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 19:54:11 +0630 HINT:  Future log output will appear in directory "log".
+^C2026-02-03 20:39:18 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 20:39:18 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 20:53:43 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 20:53:43 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 20:57:18 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 20:57:18 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 21:15:16 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 21:15:16 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 21:17:30 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 21:17:30 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-03 22:02:08 +0630 LOG:  redirecting log output to logging collector process
+2026-02-03 22:02:08 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 09:16:47 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 09:16:47 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 09:32:58 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 09:32:58 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 09:48:17 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 09:48:17 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 10:00:45 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:00:45 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 10:07:23 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:07:23 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 10:09:18 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:09:18 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 10:12:52 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:12:52 +0630 HINT:  Future log output will appear in directory "log".
+^C2026-02-04 10:36:01 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:36:01 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 10:37:57 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 10:37:57 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 16:27:13 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 16:27:13 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-04 16:35:19 +0630 LOG:  redirecting log output to logging collector process
+2026-02-04 16:35:19 +0630 HINT:  Future log output will appear in directory "log".
+^C2026-02-05 16:31:55 +0630 LOG:  redirecting log output to logging collector process
+2026-02-05 16:31:55 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-05 16:54:23 +0630 LOG:  redirecting log output to logging collector process
+2026-02-05 16:54:23 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-05 17:00:19 +0630 LOG:  redirecting log output to logging collector process
+2026-02-05 17:00:19 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-05 17:08:59 +0630 LOG:  redirecting log output to logging collector process
+2026-02-05 17:08:59 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-05 17:16:32 +0630 LOG:  redirecting log output to logging collector process
+2026-02-05 17:16:32 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 10:19:27 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 10:19:27 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 10:36:22 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 10:36:22 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 10:42:25 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 10:42:25 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 10:45:10 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 10:45:10 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 11:05:57 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 11:05:57 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 11:17:34 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 11:17:34 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 12:14:09 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 12:14:09 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-06 15:12:29 +0630 LOG:  redirecting log output to logging collector process
+2026-02-06 15:12:29 +0630 HINT:  Future log output will appear in directory "log".
+2026-02-07 21:00:57 +0630 LOG:  redirecting log output to logging collector process
+2026-02-07 21:00:57 +0630 HINT:  Future log output will appear in directory "log".
