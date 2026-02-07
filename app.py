@@ -127,6 +127,38 @@ def reset_entries_from_dataset():
     conn.commit()
     cur.close()
     conn.close()
+def seed_entries_from_reporting():
+    r_conn = get_reporting_db_connection()
+    conn = get_db_connection()
+    r_cur = r_conn.cursor()
+    cur = conn.cursor()
+    r_cur.execute("SELECT date, description, category, type, balance FROM checking_account_main")
+    rows = r_cur.fetchall()
+    for d, desc, cat, typ, amt in rows:
+        t = (typ or "").lower()
+        entry_type = "income" if t == "credit" else "expense"
+        balance = float(amt or 0)
+        cur.execute(
+            """
+            SELECT 1 FROM entries
+            WHERE date = %s AND category = %s AND description = %s AND entry_type = %s AND balance = %s
+            """,
+            (d, cat, desc, entry_type, balance),
+        )
+        exists = cur.fetchone()
+        if not exists:
+            cur.execute(
+                """
+                INSERT INTO entries (date, entry_type, category, description, balance)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (d, entry_type, cat, desc, balance),
+            )
+    conn.commit()
+    r_cur.close()
+    cur.close()
+    r_conn.close()
+    conn.close()
 @app.route('/', methods=('GET', 'POST'))
 def add_data():
     role = request.args.get('role', 'sale')
@@ -356,6 +388,7 @@ if __name__ == '__main__':
     parser.add_argument('--clear-details', action='store_true')
     parser.add_argument('--reset-from-dataset', action='store_true')
     parser.add_argument('--purge-legacy', action='store_true')
+    parser.add_argument('--seed-from-reporting', action='store_true')
     args = parser.parse_args()
     if args.init_db:
         create_database()
@@ -369,6 +402,9 @@ if __name__ == '__main__':
         sys.exit(0)
     if args.reset_from_dataset:
         reset_entries_from_dataset()
+        sys.exit(0)
+    if args.seed_from_reporting:
+        seed_entries_from_reporting()
         sys.exit(0)
     ensure_schema_updates()
     app.run(debug=True, port=5003)
