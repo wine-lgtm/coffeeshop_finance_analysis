@@ -30,7 +30,7 @@ function renderCompanyBudgetTable(budgets) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${budget.month}</td>
-            <td>$${parseFloat(budget.amount).toLocaleString()}</td>
+            <td>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
             <td>
                 <button onclick="editCompanyBudget(${budget.id}, '${budget.month}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteCompanyBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class="fas fa-trash"></i></button>
@@ -44,7 +44,7 @@ function updateCompanyBudgetSummary(budgets) {
     const total = budgets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
     const totalEl = document.getElementById('company-budget-total');
     if (totalEl) {
-        totalEl.innerText = `$${total.toLocaleString()}`;
+        totalEl.innerText = `MMK ${total.toLocaleString()}`;
     }
 }
 

@@ -49,13 +49,29 @@
     </header>
 
     <!-- SUMMARY CARDS -->
+    <!-- TOP KPI ROW -->
+ <div class="kpi-row" style="display:flex; gap:20px; margin-bottom:18px;">
+    <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+        <h4 style="color:#8B4513; margin:0 0 8px 0;">Total Budgeted</h4>
+        <div style="font-size:20px; color:#333;"> <span id="total-budgeted">MMK 0</span></div>
+    </div>
+    <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+        <h4 style="color:#8B4513; margin:0 0 8px 0;">Total Actual Spent</h4>
+        <div style="font-size:20px; color:#333;"> <span id="total-actual-spent">MMK 0</span></div>
+    </div>
+    <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+        
+        <div style="font-size:18px; color:#333;"> <span id="overall-variance"></span></div>
+    </div>
+</div>
+
     <div class="card-grid" style="display:flex; justify-content:space-between; gap:20px;">
         <div class="summary-card creamy-latte"
              style="cursor:pointer; padding:40px; width:48%; height:200px;
                     display:flex; flex-direction:column; justify-content:space-between;">
             <div>
                 <h4>Company Budget</h4>
-                <p id="company-budget-total">$0</p>
+              
             </div>
             <button onclick="location.href='overall_budget.html'"
                     style="background:#2ea44f; color:white; border:none;
@@ -69,13 +85,43 @@
                     display:flex; flex-direction:column; justify-content:space-between;">
             <div>
                 <h4>Category Budgets</h4>
-                <p id="total-budget-amount">$0</p>
+             
             </div>
             <button onclick="window.location.href='category_budget.html'"
                     style="background:#2ea44f; color:white; border:none;
                            padding:10px 20px; border-radius:5px; cursor:pointer; align-self:center;">
                 Manage Budget
             </button>
+        </div>
+    </div>
+
+    
+
+    <!-- CATEGORY BREAKDOWN (middle table with switch) -->
+    <div style="margin-top:30px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="margin:0;">Budget Breakdown by Main Categories</h3>
+            <div style="display:flex; gap:8px;">
+                <button id="switch-cogs" style="padding:8px 12px; border-radius:8px; background:#0b74ff; color:white; border:none; cursor:pointer;">COGS</button>
+                <button id="switch-opex" style="padding:8px 12px; border-radius:8px; background:#eee; border:none; cursor:pointer; color:#000">Operating Expenses</button>
+            </div>
+        </div>
+
+        <div style="background:white; border-radius:10px; padding:18px; border:1px solid #dbe7ff;">
+            <div id="category-header" style="margin-bottom:12px; font-weight:600; color:#333"> </div>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#c96812; color:white;">
+                        <th style="padding:10px; text-align:left;">Subcategory</th>
+                        <th style="padding:10px; text-align:right;">Budgeted</th>
+                        <th style="padding:10px; text-align:right;">Actual Spent</th>
+                        <th style="padding:10px; text-align:right;">Variance</th>
+                        <th style="padding:10px; text-align:center;">Status</th>
+                        <th style="padding:10px; text-align:center;">Alert</th>
+                    </tr>
+                </thead>
+                <tbody id="category-table-body"></tbody>
+            </table>
         </div>
     </div>
 
@@ -118,26 +164,192 @@
     </div>
 
     <!-- GENERAL BUDGET LIST -->
-    <h3 style="margin-top:40px;">Budget List</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Month</th>
-                <th>Category</th>
-                <th>Amount</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="budget-table-body"></tbody>
-    </table>
+   
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="newscript.js"></script>
-<script src="budget_script.js"></script>
-<script src="budget.js"></script>
-<script src="company_budget.js"></script>
+<script src="newscript.js?v=3"></script>
+<script src="budget_script.js?v=3"></script>
+<script src="budget.js?v=3"></script>
+<script src="company_budget.js?v=3"></script>
+
+<script>
+    // Populate the top KPI blocks for the current month
+    function _getCurrentMonthRange() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const month = `${y}-${m}`;
+        const start = `${month}-01`;
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const end = `${month}-${String(lastDay).padStart(2, '0')}`;
+        return { month, start, end };
+    }
+
+    async function updateTopKPIs() {
+        const elBudgeted = document.getElementById('total-budgeted');
+        const elActual = document.getElementById('total-actual-spent');
+        const elVar = document.getElementById('overall-variance');
+        if (!elBudgeted || !elActual || !elVar) return;
+
+        const { month, start, end } = _getCurrentMonthRange();
+
+        // 1) Total Budgeted: sum of admin overall budgets for current month
+        let totalBudgeted = 0;
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/api/overall_budgets?month=${month}`);
+            if (res.ok) {
+                const budgets = await res.json();
+                // overall_budgets may return one or more rows; sum their amounts
+                totalBudgeted = budgets.reduce((s, b) => s + parseFloat(b.amount || 0), 0);
+            }
+        } catch (e) { console.error('Failed to load overall budgets for KPI:', e); }
+        elBudgeted.innerText = `MMK ${totalBudgeted.toLocaleString()}`;
+
+        // 2) Total Actual Spent (use financial-summary breakdown for month)
+        let actualSpent = 0;
+        try {
+            const sumRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
+            if (sumRes.ok) {
+                const data = await sumRes.json();
+                const breakdown = data.breakdown || {};
+                const cogs = parseFloat(breakdown.cogs || 0);
+                const operating = parseFloat(breakdown.operating || 0);
+                const payroll = parseFloat(breakdown.payroll || 0);
+                actualSpent = cogs + operating + payroll;
+            }
+        } catch (e) { console.error('Failed to load financial summary:', e); }
+        elActual.innerText = `MMK ${actualSpent.toLocaleString()}`;
+
+        // 3) Variance
+        const variance = totalBudgeted - actualSpent;
+        const percent = totalBudgeted ? (variance / totalBudgeted) * 100 : 0;
+        const absVar = Math.abs(variance);
+        const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+        const sign = variance >= 0 ? '' : '-';
+        elVar.innerHTML = `${sign}MMK ${absVar.toLocaleString()} <div style="font-size:0.9rem; color:#666; margin-top:6px;">(${Math.abs(percent).toFixed(1)}% ${status})</div>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // run after page load; also refresh when budgets change if needed
+        updateTopKPIs();
+        // refresh periodically in case background edits occur
+        setInterval(updateTopKPIs, 60000);
+
+        // ---- Category breakdown table and switches ----
+        const btnCogs = document.getElementById('switch-cogs');
+        const btnOpex = document.getElementById('switch-opex');
+        const tbody = document.getElementById('category-table-body');
+        const headerEl = document.getElementById('category-header');
+        if (!btnCogs || !btnOpex || !tbody || !headerEl) return;
+
+        async function loadCategoryBreakdown(categoryKey) {
+            // categoryKey should be 'COGS' or 'Operating expense'
+            const now = new Date();
+            const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            headerEl.innerText = `1. ${categoryKey === 'COGS' ? 'COGS (Cost of Goods Sold)' : 'Operating expense (Operating Expenses)'} for ${month}`;
+
+            // fetch budgets for month
+            let budgets = [];
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/budgets?month=${month}`);
+                if (res.ok) budgets = await res.json();
+            } catch (e) { console.error('Failed to fetch budgets:', e); }
+
+            // filter rows for selected main category
+            const rows = budgets.filter(b => String(b.category).trim() === categoryKey);
+
+            // compute total budgeted for this main category
+            const totalBudgeted = rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+
+            // fetch overall actuals for the month (use financial-summary breakdown)
+            let actualMain = 0;
+            try {
+                const range = _getCurrentMonthRange();
+                const sumRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${range.start}&end_date=${range.end}`);
+                if (sumRes.ok) {
+                    const data = await sumRes.json();
+                    const breakdown = data.breakdown || {};
+                    if (categoryKey === 'COGS') actualMain = parseFloat(breakdown.cogs || 0);
+                    else actualMain = parseFloat(breakdown.operating || 0);
+                }
+            } catch (e) { console.error('Failed to fetch financial summary:', e); }
+
+            tbody.innerHTML = '';
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:16px;">No budgets found for ${month} / ${categoryKey}</td></tr>`;
+                return;
+            }
+
+            // Build complete subcategory list: prefer known allowedSubcategoriesByCategory (from budget.js) when available
+            let subList = [];
+            try {
+                const allowed = (typeof allowedSubcategoriesByCategory !== 'undefined') ? allowedSubcategoriesByCategory[categoryKey] || [] : [];
+                subList = Array.from(new Set([
+                    ...(allowed || []),
+                    ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== '')
+                ]));
+            } catch (e) {
+                subList = rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== '');
+            }
+
+            // If there's a main category budget (no subcategory), show it first
+            const mainRow = rows.find(r => r.subcategory === null || r.subcategory === undefined || String(r.subcategory).trim() === '');
+            if (mainRow) {
+                const budgeted = parseFloat(mainRow.amount || 0);
+                const actual = Math.round(actualMain * 100) / 100;
+                const variance = Math.round((budgeted - actual) * 100) / 100;
+                const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px">${mainRow.category} (Main)</td>
+                    <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:center">${status}</td>
+                    <td style="padding:10px; text-align:center">None</td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            // For each expected subcategory, show budgeted (or 0) and proportional actual
+            subList.forEach(sub => {
+                const r = rows.find(rr => String(rr.subcategory) === String(sub));
+                const budgeted = r ? parseFloat(r.amount || 0) : 0;
+                const proportion = totalBudgeted > 0 ? (budgeted / totalBudgeted) : 0;
+                const actual = Math.round((actualMain * proportion) * 100) / 100;
+                const variance = Math.round((budgeted - actual) * 100) / 100;
+                const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px">${sub}</td>
+                    <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
+                    <td style="padding:10px; text-align:center">${status}</td>
+                    <td style="padding:10px; text-align:center">None</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // set up switch buttons
+        btnCogs.addEventListener('click', function() {
+            btnCogs.style.background = '#0b74ff'; btnCogs.style.color = '#fff';
+            btnOpex.style.background = '#eee'; btnOpex.style.color = '#000';
+            loadCategoryBreakdown('COGS');
+        });
+        btnOpex.addEventListener('click', function() {
+            btnOpex.style.background = '#0b74ff'; btnOpex.style.color = '#fff';
+            btnCogs.style.background = '#eee'; btnCogs.style.color = '#000';
+            loadCategoryBreakdown('Operating expense');
+        });
+
+        // initial load
+        loadCategoryBreakdown('COGS');
+    });
+</script>
 
 </body>
 </html>

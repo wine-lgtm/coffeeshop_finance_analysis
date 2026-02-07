@@ -88,7 +88,7 @@ function renderOverallBudgetTable(budgets) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${budget.month}</td>
-            <td>$${parseFloat(budget.amount).toLocaleString()}</td>
+            <td>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
             <td>${budget.description || ''}</td>
             <td>
                 <button onclick="editOverallBudget(${budget.id}, '${budget.month}', ${budget.amount}, ${budget.description ? `'${String(budget.description).replace(/'/g, "\\'")}'` : 'null'})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>

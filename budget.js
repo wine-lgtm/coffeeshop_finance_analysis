@@ -194,7 +194,7 @@ function renderBudgetTable(budgets, tableBodyId) {
         tr.innerHTML = `
             <td>${budget.month}</td>
             <td>${budget.subcategory || '-'}</td>
-            <td${amountClassAttr}>$${parseFloat(budget.amount).toLocaleString()}</td>
+            <td${amountClassAttr}>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
             <td>
                 <button onclick="editBudget(${budget.id}, '${safeMonth}', '${safeCategory}', '${safeSubcategory}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class="fas fa-trash"></i></button>
