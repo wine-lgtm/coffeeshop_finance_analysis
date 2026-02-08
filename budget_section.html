@@ -327,15 +327,17 @@
                 const budgeted = parseFloat(mainRow.amount || 0);
                 const actual = Math.round(actualMain * 100) / 100;
                 const variance = Math.round((budgeted - actual) * 100) / 100;
-                const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+                const percent = budgeted ? (Math.abs(variance) / budgeted) * 100 : 0;
+                const status = percent <= 5 ? 'Near Budget' : (variance >= 0 ? 'Under Budget' : 'Over Budget');
                 const tr = document.createElement('tr');
+                const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
                 tr.innerHTML = `
                     <td style="padding:10px">${mainRow.category} (Main)</td>
                     <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
                     <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
                     <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
                     <td style="padding:10px; text-align:center">${status}</td>
-                    <td style="padding:10px; text-align:center">None</td>
+                    <td style="padding:10px; text-align:center">${alertText}</td>
                 `;
                 tbody.appendChild(tr);
             }
@@ -343,18 +345,26 @@
             // For each subcategory: actual spent = sum of expense records in that sub-category (from daily entries)
             subList.forEach(sub => {
                 const r = rows.find(rr => String(rr.subcategory) === String(sub));
-                const budgeted = r ? parseFloat(r.amount || 0) : 0;
+                const hasBudget = !!r;
+                const budgeted = hasBudget ? parseFloat(r.amount || 0) : 0;
                 const actual = Math.round((actualBySubcategory[sub] || 0) * 100) / 100;
                 const variance = Math.round((budgeted - actual) * 100) / 100;
-                const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+                const percent = budgeted ? (Math.abs(variance) / budgeted) * 100 : 0;
+                let status = '';
+                if (!hasBudget) {
+                    status = 'No Budget Creation';
+                } else {
+                    status = percent <= 5 ? 'Near Budget' : (variance >= 0 ? 'Under Budget' : 'Over Budget');
+                }
                 const tr = document.createElement('tr');
+                const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
                 tr.innerHTML = `
                     <td style="padding:10px">${sub}</td>
                     <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
                     <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
                     <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
                     <td style="padding:10px; text-align:center">${status}</td>
-                    <td style="padding:10px; text-align:center">None</td>
+                    <td style="padding:10px; text-align:center">${alertText}</td>
                 `;
                 tbody.appendChild(tr);
             });
