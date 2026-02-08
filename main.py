@@ -29,6 +29,10 @@ app.include_router(router)
 DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 
+# Entries DB (app.py / sales person daily records)
+CAFE_DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/cafe_v2_db"
+cafe_engine = create_engine(CAFE_DATABASE_URL, poolclass=NullPool)
+
 # --- 1. GET DATE BOUNDS (Fixes the "Show all data from start" issue) ---
 @app.get("/api/data-bounds")
 def get_data_bounds():
@@ -87,6 +91,35 @@ def get_financial_summary(start_date: date = Query(...), end_date: date = Query(
         },
         "breakdown": {"payroll": p, "cogs": c, "operating": o}
     }
+
+
+# --- 3b. EXPENSE BY SUB-CATEGORY (from sales-person entries in cafe_v2_db; only expense records, summed by subcategory) ---
+@app.get("/api/expense-by-subcategory")
+def get_expense_by_subcategory(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    sales_only: bool = Query(False, description="If true, include only entries with a non-empty staff_name (sales-person daily records)")
+):
+    """
+    Returns expense totals from cafe_v2_db.entries (daily records from app.py).
+    Only expense entries; grouped by category and subcategory (description); sum of balance = actual spent per subcategory.
+    Optionally limit to sales-person daily records when `sales_only=true`.
+    """
+    query = text("""
+        SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(balance) AS total
+        FROM entries
+        WHERE entry_type = 'expense' AND date BETWEEN :start AND :end
+          AND (:sales_only = false OR (staff_name IS NOT NULL AND TRIM(staff_name) <> ''))
+        GROUP BY category, COALESCE(TRIM(description), '')
+        ORDER BY category, subcategory
+    """)
+    with cafe_engine.connect() as conn:
+        rows = conn.execute(query, {"start": start_date, "end": end_date, "sales_only": sales_only}).mappings().all()
+    return [
+        {"category": r["category"], "subcategory": (r["subcategory"] or "").strip() or None, "total": float(r["total"]) }
+        for r in rows
+    ]
+
 
 # --- 4. PREDICTION ENGINE (FIXED NO ELLIPSIS) ---
 @app.get("/api/predict-finances")
