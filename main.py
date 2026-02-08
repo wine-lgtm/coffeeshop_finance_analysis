@@ -98,27 +98,73 @@ def get_financial_summary(start_date: date = Query(...), end_date: date = Query(
 def get_expense_by_subcategory(
     start_date: date = Query(...),
     end_date: date = Query(...),
-    sales_only: bool = Query(False, description="If true, include only entries with a non-empty staff_name (sales-person daily records)")
+    sales_only: bool = Query(False, description="If true, include only entries with a non-empty staff_name (sales-person daily records)"),
+    source: str = Query('entries', description="Source of expense data: 'entries', 'reporting', or 'both'")
 ):
     """
-    Returns expense totals from cafe_v2_db.entries (daily records from app.py).
-    Only expense entries; grouped by category and subcategory (description); sum of balance = actual spent per subcategory.
-    Optionally limit to sales-person daily records when `sales_only=true`.
+    Returns expense totals grouped by category and subcategory.
+    `source` controls which data to include:
+      - 'entries' (default): use cafe_v2_db.entries (sales-person daily records)
+      - 'reporting': use reporting DB tables (checking_account_main, credit_card_account, payroll_history)
+      - 'both': merge both sources
     """
-    query = text("""
-        SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(balance) AS total
-        FROM entries
-        WHERE entry_type = 'expense' AND date BETWEEN :start AND :end
-          AND (:sales_only = false OR (staff_name IS NOT NULL AND TRIM(staff_name) <> ''))
-        GROUP BY category, COALESCE(TRIM(description), '')
-        ORDER BY category, subcategory
-    """)
-    with cafe_engine.connect() as conn:
-        rows = conn.execute(query, {"start": start_date, "end": end_date, "sales_only": sales_only}).mappings().all()
-    return [
-        {"category": r["category"], "subcategory": (r["subcategory"] or "").strip() or None, "total": float(r["total"]) }
-        for r in rows
-    ]
+    s = (source or 'entries').lower()
+    results = {}
+
+    if s in ('entries', 'both'):
+        query_entries = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(balance) AS total
+            FROM entries
+            WHERE entry_type = 'expense' AND date BETWEEN :start AND :end
+              AND (:sales_only = false OR (staff_name IS NOT NULL AND TRIM(staff_name) <> ''))
+            GROUP BY category, COALESCE(TRIM(description), '')
+            ORDER BY category, subcategory
+        """)
+        with cafe_engine.connect() as conn:
+            rows = conn.execute(query_entries, {"start": start_date, "end": end_date, "sales_only": sales_only}).mappings().all()
+        for r in rows:
+            cat = r["category"]
+            sub = (r["subcategory"] or "").strip() or ''
+            key = (cat or '') + '||' + sub
+            results[key] = results.get(key, 0) + float(r["total"])
+
+    if s in ('reporting', 'both'):
+        q_main = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(amount) AS total
+            FROM checking_account_main
+            WHERE date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(description), '')
+        """)
+        q_cc = text("""
+            SELECT category, COALESCE(TRIM(vendor), '') AS subcategory, SUM(amount) AS total
+            FROM credit_card_account
+            WHERE date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(vendor), '')
+        """)
+        q_pay = text("""
+            SELECT 'Payroll' AS category, COALESCE(TRIM(employee_name), '') AS subcategory, SUM(total_business_cost) AS total
+            FROM payroll_history
+            WHERE pay_date BETWEEN :start AND :end
+            GROUP BY COALESCE(TRIM(employee_name), '')
+        """)
+        with engine.connect() as conn:
+            for qry in (q_main, q_cc, q_pay):
+                try:
+                    rows = conn.execute(qry, {"start": start_date, "end": end_date}).mappings().all()
+                    for r in rows:
+                        cat = r["category"]
+                        sub = (r.get("subcategory") or "").strip() or ''
+                        key = (cat or '') + '||' + sub
+                        results[key] = results.get(key, 0) + abs(float(r["total"] or 0))
+                except Exception:
+                    continue
+
+    out = []
+    for k, v in results.items():
+        cat, sub = k.split('||', 1)
+        out.append({"category": cat, "subcategory": sub or None, "total": float(v)})
+    out.sort(key=lambda x: (x.get('category') or '', x.get('subcategory') or ''))
+    return out
 
 
 # --- 4. PREDICTION ENGINE (FIXED NO ELLIPSIS) ---
