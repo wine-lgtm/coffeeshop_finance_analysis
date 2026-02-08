@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Manage Budget</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -169,12 +172,15 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="newscript.js?v=3"></script>
-<script src="budget_script.js?v=3"></script>
-<script src="budget.js?v=3"></script>
-<script src="company_budget.js?v=3"></script>
+<script src="newscript.js?v=4"></script>
+<script src="budget_script.js?v=4"></script>
+<script src="budget.js?v=4"></script>
+<script src="company_budget.js?v=4"></script>
 
 <script>
+    // Fixed API base so it works from both localhost and Go Live (127.0.0.1). Backend must run on port 8000.
+    const API_BASE = 'http://127.0.0.1:8000';
+
     // Populate the top KPI blocks for the current month
     function _getCurrentMonthRange() {
         const now = new Date();
@@ -198,7 +204,7 @@
         // 1) Total Budgeted: sum of admin overall budgets for current month
         let totalBudgeted = 0;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/overall_budgets?month=${month}`);
+            const res = await fetch(`${API_BASE}/api/overall_budgets?month=${month}`);
             if (res.ok) {
                 const budgets = await res.json();
                 // overall_budgets may return one or more rows; sum their amounts
@@ -210,7 +216,7 @@
         // 2) Total Actual Spent (use financial-summary breakdown for month)
         let actualSpent = 0;
         try {
-            const sumRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
+            const sumRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
             if (sumRes.ok) {
                 const data = await sumRes.json();
                 const breakdown = data.breakdown || {};
@@ -229,6 +235,14 @@
         const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
         const sign = variance >= 0 ? '' : '-';
         elVar.innerHTML = `${sign}MMK ${absVar.toLocaleString()} <div style="font-size:0.9rem; color:#666; margin-top:6px;">(${Math.abs(percent).toFixed(1)}% ${status})</div>`;
+    }
+
+    // Normalize API category to budget category key (e.g. "Operating Expense" -> "Operating expense")
+    function _normalizeCategory(cat) {
+        if (!cat) return '';
+        const c = String(cat).trim();
+        if (c.toLowerCase() === 'operating expense') return 'Operating expense';
+        return c;
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -253,7 +267,7 @@
             // fetch budgets for month
             let budgets = [];
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/budgets?month=${month}`);
+                const res = await fetch(`${API_BASE}/api/budgets?month=${month}`);
                 if (res.ok) budgets = await res.json();
             } catch (e) { console.error('Failed to fetch budgets:', e); }
 
@@ -263,18 +277,24 @@
             // compute total budgeted for this main category
             const totalBudgeted = rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
 
-            // fetch overall actuals for the month (use financial-summary breakdown)
-            let actualMain = 0;
+            // fetch actual spent per subcategory from daily expense entries (only expense records, summed by subcategory)
+            const { start, end } = _getCurrentMonthRange();
+            let actualBySubcategory = {};
             try {
-                const range = _getCurrentMonthRange();
-                const sumRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${range.start}&end_date=${range.end}`);
-                if (sumRes.ok) {
-                    const data = await sumRes.json();
-                    const breakdown = data.breakdown || {};
-                    if (categoryKey === 'COGS') actualMain = parseFloat(breakdown.cogs || 0);
-                    else actualMain = parseFloat(breakdown.operating || 0);
+                const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true`);
+                if (expRes.ok) {
+                    const expList = await expRes.json();
+                    const byCat = {};
+                    expList.forEach(item => {
+                        const catKey = _normalizeCategory(item.category);
+                        if (catKey !== categoryKey) return;
+                        const sub = (item.subcategory != null && item.subcategory !== '') ? String(item.subcategory).trim() : '';
+                        if (!byCat[sub]) byCat[sub] = 0;
+                        byCat[sub] += parseFloat(item.total || 0);
+                    });
+                    actualBySubcategory = byCat;
                 }
-            } catch (e) { console.error('Failed to fetch financial summary:', e); }
+            } catch (e) { console.error('Failed to fetch expense-by-subcategory:', e); }
 
             tbody.innerHTML = '';
             if (rows.length === 0) {
@@ -288,11 +308,18 @@
                 const allowed = (typeof allowedSubcategoriesByCategory !== 'undefined') ? allowedSubcategoriesByCategory[categoryKey] || [] : [];
                 subList = Array.from(new Set([
                     ...(allowed || []),
-                    ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== '')
+                    ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== ''),
+                    ...Object.keys(actualBySubcategory).filter(s => s !== '')
                 ]));
             } catch (e) {
-                subList = rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== '');
+                subList = Array.from(new Set([
+                    ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== ''),
+                    ...Object.keys(actualBySubcategory).filter(s => s !== '')
+                ]));
             }
+
+            // Sum of actuals for this category (for main row)
+            const actualMain = Object.keys(actualBySubcategory).reduce((sum, sub) => sum + (actualBySubcategory[sub] || 0), 0);
 
             // If there's a main category budget (no subcategory), show it first
             const mainRow = rows.find(r => r.subcategory === null || r.subcategory === undefined || String(r.subcategory).trim() === '');
@@ -313,12 +340,11 @@
                 tbody.appendChild(tr);
             }
 
-            // For each expected subcategory, show budgeted (or 0) and proportional actual
+            // For each subcategory: actual spent = sum of expense records in that sub-category (from daily entries)
             subList.forEach(sub => {
                 const r = rows.find(rr => String(rr.subcategory) === String(sub));
                 const budgeted = r ? parseFloat(r.amount || 0) : 0;
-                const proportion = totalBudgeted > 0 ? (budgeted / totalBudgeted) : 0;
-                const actual = Math.round((actualMain * proportion) * 100) / 100;
+                const actual = Math.round((actualBySubcategory[sub] || 0) * 100) / 100;
                 const variance = Math.round((budgeted - actual) * 100) / 100;
                 const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
                 const tr = document.createElement('tr');
