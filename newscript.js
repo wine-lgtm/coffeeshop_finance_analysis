@@ -94,7 +94,25 @@ function setupPermissions() {
                 <div class="card"><h3>Net Profit</h3><div class="value" id="profit" style="color: #2ea44f;">$0</div></div>
                 <div class="card"><h3>Avg Labor Cost</h3><div class="value" id="report-avg">$0</div></div>
             </div>
-
+            
+<div class="detail-table-section" style="margin-top: 30px; background: white; padding: 25px; border-radius: 20px; border: 1px solid #eee;">
+    <h3 style="margin-bottom: 20px;">Detailed Transaction History</h3>
+    
+    <div style="max-height: 400px; overflow-y: auto; border: 1px solid #f1f1f1; border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                <tr style="border-bottom: 2px solid #eee;">
+                    <th style="padding: 12px; text-align: left;">Date</th>
+                    <th style="padding: 12px; text-align: left;">Description</th>
+                    <th style="padding: 12px; text-align: left;">Category</th>
+                    <th style="padding: 12px; text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody id="detailed_logs_body">
+                </tbody>
+        </table>
+    </div>
+</div>
             <div class="chart-container" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px;">
     <div class="chart-box" style="background:white; padding:15px; border-radius:15px; border: 1px solid #eee; height:320px; position: relative;">
         <h4 style="margin:0 0 10px 0;">Income Trend</h4>
@@ -183,11 +201,11 @@ async function generateFilteredReport() {
     if (!start || !end) return;
 
     try {
-        // 1. Fetch KPI cards
+        // 1. Existing KPI Fetch
         const sumRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
         const data = await sumRes.json();
 
-        // 2. Fetch the actual daily income trend from Database
+        // 2. Existing Trend Fetch
         const trendRes = await fetch(`http://127.0.0.1:8000/api/income-progress?start_date=${start}&end_date=${end}`);
         const trendData = await trendRes.json();
 
@@ -197,12 +215,39 @@ async function generateFilteredReport() {
         document.getElementById('report-avg').innerText = `$${data.summary.exact_labor_cost.toLocaleString()}`;
         document.getElementById('gross').innerText = `$${(data.summary.total_revenue - data.breakdown.cogs).toLocaleString()}`;
 
-        // Update BOTH charts using database data
+        // Update Charts
         updateChartsWithBackendData(trendData, data.breakdown);
+
+        // --- THE FULL FIX: Detailed Table ---
+        const logRes = await fetch(`http://127.0.0.1:8000/api/detailed-cashflow?start_date=${start}&end_date=${end}`);
+        const logs = await logRes.json();
+        
+        const tableBody = document.getElementById('detailed_logs_body'); 
+        if (tableBody) {
+            tableBody.innerHTML = ''; // Reset table content
+
+            if (logs.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">No records found for this period.</td></tr>';
+            } else {
+                logs.forEach(item => {
+                    const isExpense = item.amount < 0;
+                    const row = `
+                        <tr>
+                            <td>${item.date}</td>
+                            <td>${item.description}</td>
+                            <td><span class="badge-category">${item.category}</span></td>
+                            <td style="color: ${isExpense ? '#ff4d4d' : '#2ecc71'}; font-weight: bold; text-align: right;">
+                                ${isExpense ? '-' : ''}$${Math.abs(item.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            }
+        }
 
     } catch (e) {
         console.error("Backend error:", e);
-        alert("Backend offline. Make sure main.py is running!");
     }
 }
 async function runPrediction() {
@@ -266,7 +311,7 @@ function renderDualAccuracyCharts(comparisonData) {
                 { label: 'Predict', data: comparisonData.map(c => c.pre_inc), borderColor: '#007bff', borderDash: [5, 5], tension: 0.3 }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { responsive: true, maintainAspectRatio: false ,scales: { y: { beginAtZero: true} }}
     });
 
     // --- CHART 2: EXPENSE ---
@@ -281,7 +326,7 @@ function renderDualAccuracyCharts(comparisonData) {
                 { label: 'Predict', data: comparisonData.map(c => c.pre_exp), borderColor: '#f66a0a', borderDash: [5, 5], tension: 0.3 }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { responsive: true, maintainAspectRatio: false,scales: { y: { beginAtZero: true} } }
     });
 }
 function exportToPDF() {
@@ -315,7 +360,7 @@ function updateChartsWithBackendData(trendData, breakdown) {
                 tension: 0.3
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { responsive: true, maintainAspectRatio: false}
     });
 
     // 2. EXPENSE MIX (Pie Chart)
@@ -330,7 +375,7 @@ function updateChartsWithBackendData(trendData, breakdown) {
                 backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc']
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { responsive: true, maintainAspectRatio: false}
     });
 }
 

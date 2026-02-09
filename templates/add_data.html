@@ -230,6 +230,21 @@
     </div>
     {% endif %}
 
+    {% if role == 'admin' %}
+    <div class="card">
+        <div class="header">
+            <h2><i class="fas fa-file-import"></i> Import Entries (CSV/Excel)</h2>
+        </div>
+        <form method="POST" action="{{ url_for('import_entries', role=role, origin=origin) }}" enctype="multipart/form-data">
+            <input type="hidden" name="origin" value="{{ origin }}">
+            <input type="file" name="import_file" accept=".csv,.xlsx,.xls" required>
+            <div class="full-width">
+                <button type="submit" class="submit-btn">Import</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
     <!-- Form Card -->
     <div class="card">
         <div class="header">
