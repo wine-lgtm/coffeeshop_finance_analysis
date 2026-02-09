@@ -1,5 +1,13 @@
+
 flask
 psycopg2-binary
 python-dotenv
 gunicorn
 fpdf2
+fastapi
+uvicorn
+pandas
+numpy
+statsmodels
+sqlalchemy
+requests
