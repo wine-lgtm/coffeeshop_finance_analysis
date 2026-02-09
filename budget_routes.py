@@ -25,6 +25,23 @@ def get_overall_budget_month_range():
 
 DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
+# cafe entries DB (sales-person daily records) used optionally by key-insights
+CAFE_DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/cafe_v2_db"
+cafe_engine = create_engine(CAFE_DATABASE_URL, poolclass=NullPool)
+
+
+def _normalize_category_server(cat: str):
+    """Normalize category names on the server to match frontend keys.
+    Examples: 'Operating Expense' -> 'Operating expense', 'COGS' stays 'COGS'.
+    """
+    if not cat:
+        return ''
+    c = str(cat).strip()
+    if c.lower() == 'operating expense':
+        return 'Operating expense'
+    if c.lower() == 'cogs':
+        return 'COGS'
+    return c
 
 # Create tables if not exist
 try:
@@ -589,3 +606,159 @@ def delete_overall_budget(budget_id: int):
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Overall budget not found")
     return {"message": "Overall budget deleted successfully"}
+
+
+# --- KEY INSIGHTS (aggregates budgets + expenses for a month) ---
+@router.get("/api/key-insights")
+def get_key_insights(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    month: Optional[str] = None,
+    sales_only: bool = Query(False),
+    source: str = Query('both')
+):
+    s = (source or 'both').lower()
+
+    # 1) load budgets for month
+    budgets = []
+    if month:
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT category, COALESCE(subcategory, '') AS subcategory, amount FROM budgets WHERE month = :month"), {"month": month}).mappings().all()
+        budgets = [dict(r) for r in rows]
+
+    # map budgets by (category, subcategory) - normalize category to match frontend
+    budget_map = {}
+    for b in budgets:
+        key = (_normalize_category_server(b.get('category') or ''), (b.get('subcategory') or '').strip())
+        budget_map[key] = float(b.get('amount') or 0)
+
+    # 2) gather expense totals from reporting DB and optional entries DB
+    results = {}
+
+    if s in ('reporting', 'both'):
+        q_main = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(amount) AS total
+            FROM checking_account_main
+            WHERE date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(description), '')
+        """)
+        q_cc = text("""
+            SELECT category, COALESCE(TRIM(vendor), '') AS subcategory, SUM(amount) AS total
+            FROM credit_card_account
+            WHERE date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(vendor), '')
+        """)
+        q_pay = text("""
+            SELECT 'Payroll' AS category, COALESCE(TRIM(employee_name), '') AS subcategory, SUM(total_business_cost) AS total
+            FROM payroll_history
+            WHERE pay_date BETWEEN :start AND :end
+            GROUP BY COALESCE(TRIM(employee_name), '')
+        """)
+        with engine.connect() as conn:
+            for qry in (q_main, q_cc, q_pay):
+                try:
+                    rows = conn.execute(qry, {"start": start_date, "end": end_date}).mappings().all()
+                    for r in rows:
+                        cat = _normalize_category_server((r.get('category') or '').strip())
+                        sub = (r.get('subcategory') or '').strip()
+                        key = (cat, sub)
+                        results[key] = results.get(key, 0) + abs(float(r.get('total') or 0))
+                except Exception:
+                    continue
+
+    if s in ('entries', 'both'):
+        q_entries = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(balance) AS total, staff_name
+            FROM entries
+            WHERE entry_type = 'expense' AND date BETWEEN :start AND :end
+              AND (:sales_only = false OR (staff_name IS NOT NULL AND TRIM(staff_name) <> ''))
+            GROUP BY category, COALESCE(TRIM(description), ''), staff_name
+        """)
+        try:
+            with cafe_engine.connect() as conn:
+                rows = conn.execute(q_entries, {"start": start_date, "end": end_date, "sales_only": sales_only}).mappings().all()
+                for r in rows:
+                    cat = _normalize_category_server((r.get('category') or '').strip())
+                    sub = (r.get('subcategory') or '').strip()
+                    key = (cat, sub)
+                    results[key] = results.get(key, 0) + abs(float(r.get('total') or 0))
+        except Exception:
+            # if cafe DB not available, ignore entries-source
+            pass
+
+    # 3) build entries list combining budgets and actuals
+    entries = []
+    seen_keys = set()
+
+    # include keys from budgets and results
+    for (cat, sub) in list(set(list(budget_map.keys()) + list(results.keys()))):
+        key = (cat or '', sub or '')
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        budgeted = float(budget_map.get(key) or 0)
+        actual = float(results.get(key) or 0)
+
+        # status: exclude main-level rows (blank subcategory) from counts; still include in entries with subcategory '' marked as main
+        variance = budgeted - actual
+        percent = (abs(variance) / budgeted * 100) if budgeted else 0
+        if not sub or sub.strip() == '':
+            status = 'Main'
+        else:
+            if not budgeted or budgeted == 0:
+                status = 'No Budget Creation'
+            else:
+                if percent <= 5:
+                    status = 'Near Budget'
+                else:
+                    status = 'Under Budget' if variance >= 0 else 'Over Budget'
+
+        entries.append({
+            'category': cat,
+            'subcategory': sub or None,
+            'budgeted': round(budgeted, 2),
+            'actual': round(actual, 2),
+            'variance': round(variance, 2),
+            'status': status
+        })
+
+    # 4) top expensive subcategories (exclude blank subcategory)
+    tops = sorted(
+        [{'category': k[0], 'subcategory': k[1], 'actual': v} for k, v in results.items() if k[1] and k[1].strip() != ''],
+        key=lambda x: x['actual'], reverse=True
+    )
+
+    # 5) summary counts (exclude main-level / blank subcategories from counts)
+    summary_counts = {'Under Budget': {'count': 0, 'total': 0}, 'Over Budget': {'count': 0, 'total': 0}, 'Near Budget': {'count': 0, 'total': 0}, 'No Budget Creation': {'count': 0, 'total': 0}}
+    alerts = 0
+    for e in entries:
+        if not e.get('subcategory'):
+            continue
+        st = e.get('status')
+        if st == 'Under Budget':
+            summary_counts['Under Budget']['count'] += 1
+            summary_counts['Under Budget']['total'] += max(0, e.get('variance') or 0)
+        elif st == 'Over Budget':
+            summary_counts['Over Budget']['count'] += 1
+            summary_counts['Over Budget']['total'] += max(0, -(e.get('variance') or 0))
+            alerts += 1
+        elif st == 'Near Budget':
+            summary_counts['Near Budget']['count'] += 1
+            summary_counts['Near Budget']['total'] += abs(e.get('variance') or 0)
+        elif st == 'No Budget Creation':
+            summary_counts['No Budget Creation']['count'] += 1
+            summary_counts['No Budget Creation']['total'] += e.get('actual') or 0
+
+    recommendations = []
+    # simple recommendation: focus on top over-budget items
+    biggest_over = next((x for x in entries if x.get('status') == 'Over Budget' and x.get('subcategory')), None)
+    if biggest_over:
+        recommendations.append(f"Review purchases for {biggest_over.get('category')} / {biggest_over.get('subcategory')} .")
+
+    return {
+        'top_expensive': tops[:5],
+        'entries': entries,
+        'alerts': alerts,
+        'recommendations': recommendations,
+        'summary': summary_counts
+    }
