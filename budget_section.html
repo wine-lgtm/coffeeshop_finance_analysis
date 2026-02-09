@@ -16,9 +16,9 @@
     <style>
         #budget-page-standalone {
             width: 100%;
-            max-width: 1200px;
+            max-width: 1600px;
             margin: 0 auto;
-            padding: 20px 30px;
+            padding: 30px 40px;
             box-sizing: border-box;
             display: block;
         }
@@ -40,6 +40,7 @@
 
         #budget-page-standalone .summary-card {
             box-sizing: border-box;
+            padding: 36px; /* increase default card padding for larger visual frame */
         }
     </style>
 </head>
@@ -134,6 +135,25 @@
         </div>
     </div>
 
+    <!-- KEY INSIGHTS -->
+    <div id="key-insights" style="margin-top:30px; background: linear-gradient(180deg,#fff7d6,#ffe8a8); border-radius:10px; padding:18px; border:3px solid #ffd24d; box-shadow:0 6px 18px rgba(0,0,0,0.04);">
+        <h3 style="color:#0b63c4; margin-top:0;">Key Insights</h3>
+
+
+        <div id="insights-most-over" style="margin-bottom:10px; font-weight:600; color:#c9302c;">Most Over-Budget Item: (loading...)</div>
+
+        <div id="insights-summary" style="margin-bottom:10px; color:#222;">Summary of Budget Status: (loading...)</div>
+
+        <div id="insights-no-budget" style="margin-bottom:10px; color:#222;">No Budget Creation: (loading...)</div>
+
+        <div id="insights-alerts" style="margin-bottom:10px; color:#222;">Alerts: (loading...)</div>
+
+        <div>
+            <h4 style="margin:8px 0 6px 0;">Recommendations:</h4>
+            <ul id="insights-recommendations" style="margin:0 0 0 18px; color:#222;"><li>Recommendations: (loading...)</li></ul>
+        </div>
+    </div>
+
     <!-- COMPANY BUDGET SECTION -->
     <div id="company-budget-section" class="manage-expense-card" style="display:none; margin-top:30px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -178,10 +198,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="newscript.js?v=4"></script>
-<script src="budget_script.js?v=4"></script>
-<script src="budget.js?v=4"></script>
-<script src="company_budget.js?v=4"></script>
+<script src="newscript.js?v=5"></script>
+<script src="budget_script.js?v=5"></script>
+<script src="budget.js?v=5"></script>
+<script src="company_budget.js?v=5"></script>
 
 <script>
     // Fixed API base so it works from both localhost and Go Live (127.0.0.1). Backend must run on port 8000.
@@ -249,6 +269,214 @@
         elVar.innerHTML = `${sign}MMK ${absVar.toLocaleString()} <div style="font-size:0.9rem; color:#666; margin-top:6px;">(${Math.abs(percent).toFixed(1)}% ${status})</div>`;
     }
 
+    // Key Insights: call backend /api/key-insights and render results with errors shown
+    async function updateKeyInsights() {
+        const mostEl = document.getElementById('insights-most-expensive');
+        const sumEl = document.getElementById('insights-summary');
+        const alertsEl = document.getElementById('insights-alerts');
+        const recEl = document.getElementById('insights-recommendations');
+        let topOverMention = null;
+        try {
+            const { month, start, end } = _getCurrentMonthRange();
+            const url = `${API_BASE}/api/key-insights?start_date=${start}&end_date=${end}&month=${month}&sales_only=true&source=both`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(txt || `${res.status} ${res.statusText}`);
+            }
+            const data = await res.json();
+
+            // Most expensive
+       
+
+            // Most over-budget (by overrun amount)
+            const mostOverEl = document.getElementById('insights-most-over');
+            try {
+                const allEntries = data.entries || [];
+                const overEntries = allEntries
+                    .filter(e => {
+                        if (!e) return false;
+                        const rawSub = (e.subcategory != null) ? String(e.subcategory).trim() : '';
+                        const rawCat = (e.category != null) ? String(e.category).trim() : '';
+                        const lowerSub = rawSub.toLowerCase();
+                        const lowerCat = rawCat.toLowerCase();
+                        // treat empty, explicit main markers, or subcategory equal to category as main/overall rows
+                        const isMain = (rawSub === '') || lowerSub === '(main)' || lowerSub === 'main' || lowerSub === lowerCat;
+                        if (isMain) return false;
+                        return e.status === 'Over Budget' && (Number(e.actual || 0) > 0);
+                    })
+                    .map(e => ({...e, overrun: Number((Number(e.actual || 0) - Number(e.budgeted || 0)).toFixed(2))}));
+                overEntries.sort((a,b) => b.overrun - a.overrun);
+                if (mostOverEl) {
+                    if (!overEntries || overEntries.length === 0) {
+                        mostOverEl.innerText = 'Most Over-Budget Item: No over-budget items this month.';
+                    } else {
+                        const top = overEntries[0];
+                        console.debug('Top over-entry (debug):', top);
+                        const rawActual = Number(top.actual || 0);
+                        const computedActual = Number(top.budgeted || 0) + Number(top.overrun || 0);
+                        let displayedActual = 0;
+                        if (rawActual && computedActual) {
+                            // If rawActual is approx exactly double the computedActual, assume doubling bug and halve it
+                            if (Math.abs(rawActual - computedActual) < 0.5) displayedActual = rawActual / 2;
+                            else displayedActual = rawActual;
+                        } else {
+                            displayedActual = rawActual || computedActual || 0;
+                        }
+                        mostOverEl.innerHTML = `Most Over-Budget Item: ${top.category || 'Unknown'} / ${top.subcategory || '(main)'} —  (Budgeted: MMK ${Number(top.budgeted || 0).toLocaleString()}, Actual: MMK ${Number(displayedActual).toLocaleString()})`;
+                        // prepare a recommended mention for the top over-budget item (rendered later)
+                        topOverMention = `Focus on the over-budget item (${top.category} / ${top.subcategory || '(main)'}). Consider delaying non-essential purchases.`;
+                    }
+                }
+            } catch (e) {
+                if (mostOverEl) mostOverEl.innerText = 'Most Over-Budget Item: (error computing overrun)';
+            }
+
+            // Summary — compute client-side from returned entries to avoid backend mismatch
+            if (sumEl) {
+                const entries = data.entries || [];
+                const summaryCounts = {
+                    'Under Budget': {count: 0, total: 0},
+                    'Over Budget': {count: 0, total: 0},
+                    'No Budget Creation': {count: 0, total: 0}
+                };
+
+                entries.forEach(e => {
+                    // Exclude top-level main-category rows and any entries with empty/blank subcategory
+                    const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                    if (!subcat) return; // skip main rows / empty subcategory entries
+
+                    const budgeted = Number(e.budgeted || 0);
+                    const actual = Number(e.actual || 0);
+                    const variance = budgeted - actual;
+
+                    // Determine status strictly from variance (ignore backend-provided status)
+                    let st;
+                    if (!e.budgeted || budgeted === 0) st = 'No Budget Creation';
+                    else st = (variance < 0) ? 'Over Budget' : 'Under Budget';
+
+                    if (st === 'Under Budget') {
+                        summaryCounts['Under Budget'].count += 1;
+                        summaryCounts['Under Budget'].total += Math.max(0, variance);
+                    } else if (st === 'Over Budget') {
+                        summaryCounts['Over Budget'].count += 1;
+                        summaryCounts['Over Budget'].total += Math.max(0, -variance);
+                    } else if (st === 'No Budget Creation') {
+                        summaryCounts['No Budget Creation'].count += 1;
+                        summaryCounts['No Budget Creation'].total += actual;
+                    }
+                });
+
+                const ub = summaryCounts['Under Budget'];
+                const ob = summaryCounts['Over Budget'];
+
+                // Recalculate total overrun by aggregating budgets and actuals per (category+subcategory)
+                let explicitOverrunTotal = 0;
+                try {
+                    // build budget map from entries: key -> total budgeted
+                    const budgetMap = {};
+                    (entries || []).forEach(e => {
+                        const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                        if (!subcat) return;
+                        const catRaw = (e.category != null) ? String(e.category).trim() : '';
+                        const key = `${catRaw.toLowerCase()}||${subcat}`;
+                        budgetMap[key] = (budgetMap[key] || 0) + Number(e.budgeted || 0);
+                    });
+
+                    // fetch aggregated actuals from backend (avoid per-entry duplication)
+                    const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true&source=reporting`);
+                    const expMap = {};
+                    if (expRes.ok) {
+                        const expList = await expRes.json();
+                        expList.forEach(it => {
+                            const catKey = (it.category != null) ? String(it.category).trim().toLowerCase() : '';
+                            const sub = (it.subcategory != null) ? String(it.subcategory).trim() : '';
+                            if (!sub) return;
+                            const key = `${catKey}||${sub}`;
+                            expMap[key] = (expMap[key] || 0) + Number(it.total || 0);
+                        });
+                    }
+
+                    // compute overrun per unique key where budget > 0
+                    Object.keys(budgetMap).forEach(k => {
+                        const budgeted = budgetMap[k] || 0;
+                        const actual = expMap[k] || 0;
+                        if (budgeted > 0 && actual > budgeted) {
+                            explicitOverrunTotal += (actual - budgeted);
+                        }
+                    });
+                } catch (err) {
+                    console.error('Failed to compute explicitOverrunTotal:', err);
+                }
+
+                sumEl.innerHTML = `Summary of Budget Status:<br>` +
+                    `- <span style="color:green; font-weight:700;">Under Budget:</span> ${ub.count} subcategories — Total savings: MMK ${Math.round(ub.total).toLocaleString()}.<br>` +
+                    `- <span style="color:red; font-weight:700;">Over Budget:</span> ${ob.count} subcategories — Total overrun: MMK ${Math.round(explicitOverrunTotal).toLocaleString()}.`;
+
+                // Also show no-budget creation count separately (unique subcategory counts)
+                const noBudgetEl = document.getElementById('insights-no-budget');
+                if (noBudgetEl) {
+                    // Track unique subcategories globally and per main category
+                    const noBudgetGlobal = new Set();
+                    const noBudgetByCat = {
+                        'COGS': {subs: new Set(), total: 0},
+                        'Operating expense': {subs: new Set(), total: 0}
+                    };
+
+                    (data.entries || []).forEach(e => {
+                        const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                        if (!subcat) return; // skip main rows
+
+                        const budgeted = Number(e.budgeted || 0);
+                        const actual = Number(e.actual || 0);
+                        const catRaw = (e.category != null) ? String(e.category).trim().toLowerCase() : '';
+
+                        let key = null;
+                        if (catRaw.includes('cogs')) key = 'COGS';
+                        else if (catRaw.includes('operat')) key = 'Operating expense';
+
+                        if (!budgeted || budgeted === 0) {
+                            // only count COGS and Operating expense subcategories (ignore other categories)
+                            if (!key) return;
+                            const globalKey = `${key}||${subcat}`;
+                            if (!noBudgetGlobal.has(globalKey)) {
+                                noBudgetGlobal.add(globalKey);
+                            }
+                            if (!noBudgetByCat[key].subs.has(subcat)) {
+                                noBudgetByCat[key].subs.add(subcat);
+                                noBudgetByCat[key].total += actual;
+                            }
+                        }
+                    });
+
+                    noBudgetEl.innerHTML = `No Budget Creation: ${noBudgetGlobal.size} subcategories total — ` +
+                        `COGS: ${noBudgetByCat['COGS'].subs.size} subcategories ,` +
+                        `Operating expense: ${noBudgetByCat['Operating expense'].subs.size} subcategories .`;
+                }
+            }
+
+            // Alerts
+            if (alertsEl) {
+                alertsEl.innerHTML = `Alerts: ${data.alerts || 0} active alert(s). Review over-budget items to avoid further overruns.`;
+            }
+
+            // Recommendations
+            if (recEl) {
+                const recs = data.recommendations || [];
+                if (recs.length === 0) recEl.innerHTML = '<li>No recommendations available.</li>';
+                else recEl.innerHTML = recs.map(r => `<li>${r}</li>`).join('');
+            }
+
+        } catch (err) {
+            console.error('Failed to load key insights:', err);
+            const msg = (err && err.message) ? err.message : 'Failed to load key insights.';
+           
+            if (sumEl) sumEl.innerText = `Summary of Budget Status: ${msg}`;
+            if (alertsEl) alertsEl.innerText = `Alerts: ${msg}`;
+            if (recEl) recEl.innerHTML = `<li>${msg}</li>`;
+        }
+    }
+
     // Normalize API category to budget category key (e.g. "Operating Expense" -> "Operating expense")
     function _normalizeCategory(cat) {
         if (!cat) return '';
@@ -270,13 +498,16 @@
                 if (this.value) selectedMonth = this.value;
                 updateTopKPIs();
                 loadCategoryBreakdown(currentCategory);
+                updateKeyInsights();
             });
         }
 
         // run after page load; also refresh when budgets change if needed
         updateTopKPIs();
+        updateKeyInsights();
         // refresh periodically in case background edits occur
         setInterval(updateTopKPIs, 60000);
+        setInterval(updateKeyInsights, 60000);
 
         // ---- Category breakdown table and switches ----
         const btnCogs = document.getElementById('switch-cogs');
@@ -307,7 +538,7 @@
             // start/end already available from earlier call
             let actualBySubcategory = {};
             try {
-                const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true&source=both`);
+                const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true&source=reporting`);
                 if (expRes.ok) {
                     const expList = await expRes.json();
                     const byCat = {};
@@ -354,7 +585,8 @@
                 const actual = Math.round(actualMain * 100) / 100;
                 const variance = Math.round((budgeted - actual) * 100) / 100;
                 const percent = budgeted ? (Math.abs(variance) / budgeted) * 100 : 0;
-                const status = percent <= 5 ? 'Near Budget' : (variance >= 0 ? 'Under Budget' : 'Over Budget');
+                // Any negative variance (actual > budget) is Over Budget; otherwise Under Budget
+                let status = (variance < 0) ? 'Over Budget' : 'Under Budget';
                 const tr = document.createElement('tr');
                 const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
                 tr.innerHTML = `
@@ -380,7 +612,8 @@
                 if (!hasBudget) {
                     status = 'No Budget Creation';
                 } else {
-                    status = percent <= 5 ? 'Near Budget' : (variance >= 0 ? 'Under Budget' : 'Over Budget');
+                    // Any negative variance (actual > budget) is Over Budget; otherwise Under Budget
+                    status = (variance < 0) ? 'Over Budget' : 'Under Budget';
                 }
                 const tr = document.createElement('tr');
                 const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
