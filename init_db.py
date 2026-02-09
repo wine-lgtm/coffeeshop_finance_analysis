@@ -6,7 +6,8 @@ import os
 DB_HOST = "localhost"
 DB_USER = "postgres"
 # Try passwords: 'postgres' (common), 'postgresql' (from app.py), '' (empty)
-PASSWORDS_TO_TRY = ["postgres", "postgresql", "password", ""]
+PASSWORDS_TO_TRY = ["postgres", "postgresql", "password", "", "Prim#2504"]
+
 
 def get_connection(dbname=None, password=None):
     try:
