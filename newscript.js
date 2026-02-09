@@ -10,23 +10,26 @@ let expensePieInstance = null;
 // =======================
 // LOGIN & SYSTEM INIT
 // =======================
-document.getElementById('loginForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPassword').value;
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPassword').value;
 
-    if (email === "owner@coffee.com" && pass === "admin123") {
-        currentUserRole = "admin";
-        localStorage.setItem('coffee_user_role', 'admin');
-        initSystem("Administrator");
-    } else if (email === "sale@coffee.com" && pass === "sale123") {
-        currentUserRole = "sale";
-        localStorage.setItem('coffee_user_role', 'sale');
-        initSystem("Sale Person");
-    } else {
-        alert("Invalid credentials!");
-    }
-});
+        if (email === "owner@coffee.com" && pass === "admin123") {
+            currentUserRole = "admin";
+            localStorage.setItem('coffee_user_role', 'admin');
+            initSystem("Administrator");
+        } else if (email === "sale@coffee.com" && pass === "sale123") {
+            currentUserRole = "sale";
+            localStorage.setItem('coffee_user_role', 'sale');
+            initSystem("Sale Person");
+        } else {
+            alert("Invalid credentials!");
+        }
+    });
+}
 
 function initSystem(roleName) {
     document.getElementById('login-section').classList.add('hidden');
