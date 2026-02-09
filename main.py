@@ -12,8 +12,11 @@ from fpdf import FPDF
 import pandas as pd
 from sqlalchemy import text
 from dateutil.relativedelta import relativedelta
+from budget_routes import router as budget_router
 
 app = FastAPI(title="Coffee Shop Backend")
+
+app.include_router(budget_router)
 
 app.add_middleware(
     CORSMiddleware,
