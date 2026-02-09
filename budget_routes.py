@@ -23,10 +23,11 @@ def get_overall_budget_month_range():
     max_str = max_first.strftime("%Y-%m")
     return min_str, max_str
 
-DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
+
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 # cafe entries DB (sales-person daily records) used optionally by key-insights
-CAFE_DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/cafe_v2_db"
+CAFE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/cafe_v2_db"
 cafe_engine = create_engine(CAFE_DATABASE_URL, poolclass=NullPool)
 
 
