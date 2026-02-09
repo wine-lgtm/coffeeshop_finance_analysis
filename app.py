@@ -14,7 +14,7 @@ app.secret_key = 'supersecretkey'
 DB_NAME = "cafe_v2_db"
 REPORTING_DB_NAME = "coffeeshop_cashflow"
 DB_USER = "postgres"
-DB_PASSWORD = "Prim#2504"
+DB_PASSWORD = "postgresql"
 DB_HOST = "localhost"
 
 def get_db_connection():
@@ -159,6 +159,120 @@ def seed_entries_from_reporting():
     cur.close()
     r_conn.close()
     conn.close()
+@app.route('/import_entries', methods=['POST'])
+def import_entries():
+    role = request.args.get('role', 'sale')
+    origin = request.args.get('origin', 'http://127.0.0.1:8080')
+    f = request.files.get('import_file')
+    if not f or f.filename == '':
+        return redirect(url_for('add_data', role=role, origin=origin))
+    ext = os.path.splitext(f.filename)[1].lower()
+    rows = []
+    try:
+        if ext == '.csv':
+            import csv
+            f.stream.seek(0)
+            reader = csv.DictReader((line.decode('utf-8-sig') for line in f.stream))
+            for row in reader:
+                rows.append(row)
+        elif ext in ('.xlsx', '.xls'):
+            try:
+                import pandas as pd
+                df = pd.read_excel(f, engine='openpyxl')
+            except Exception:
+                import pandas as pd
+                df = pd.read_excel(f)
+            rows = df.to_dict(orient='records')
+        else:
+            return redirect(url_for('add_data', role=role, origin=origin))
+    except Exception as e:
+        print(f"Import read error: {e}")
+        return redirect(url_for('add_data', role=role, origin=origin))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    r_conn = get_reporting_db_connection()
+    r_cur = r_conn.cursor()
+    inserted = 0
+    for raw in rows:
+        kv = {str(k).strip().lower(): raw[k] for k in raw.keys()}
+        date_val = kv.get('date') or kv.get('pay_date')
+        desc = kv.get('description') or kv.get('employee_name') or kv.get('vendor')
+        category = kv.get('category')
+        amt = kv.get('amount') if kv.get('amount') not in (None, '') else kv.get('balance')
+        try:
+            amount = float(amt) if amt not in (None, '') else 0
+        except Exception:
+            try:
+                amount = float(str(amt).replace(',', ''))
+            except Exception:
+                amount = 0
+        t = (kv.get('type') or kv.get('entry_type') or '').strip().lower()
+        if t in ('credit', 'income'):
+            entry_type = 'income'
+        elif t in ('debit', 'expense'):
+            entry_type = 'expense'
+        else:
+            entry_type = 'income' if amount >= 0 else 'expense'
+        if date_val and category and desc:
+            cur.execute(
+                """
+                SELECT 1 FROM entries
+                WHERE date = %s AND category = %s AND description = %s AND entry_type = %s AND balance = %s
+                """,
+                (date_val, category, desc, entry_type, amount),
+            )
+            exists = cur.fetchone()
+            if exists:
+                continue
+            cur.execute(
+                """
+                INSERT INTO entries (date, entry_type, category, description, balance)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (date_val, entry_type, category, desc, amount),
+            )
+            inserted += 1
+            if (category or '').strip().lower() in ('payroll', 'payroll/labor'):
+                try:
+                    r_cur.execute(
+                        """
+                        INSERT INTO payroll_history (employee_name, pay_date, total_business_cost, role)
+                        VALUES (%s, %s, %s, 'Employee')
+                        """,
+                        (desc, date_val, amount)
+                    )
+                except Exception as e:
+                    print(f"Sync payroll failed: {e}")
+            else:
+                db_type_val = 'Credit' if entry_type == 'income' else 'Debit'
+                tx_id = f"TX-{uuid.uuid4().hex[:8].upper()}"
+                try:
+                    r_cur.execute(
+                        """
+                        SELECT 1 FROM checking_account_main
+                        WHERE date = %s AND category = %s AND description = %s AND type = %s AND amount = %s
+                        """,
+                        (date_val, category, desc, db_type_val, amount)
+                    )
+                    r_exists = r_cur.fetchone()
+                    if not r_exists:
+                        r_cur.execute(
+                            """
+                            INSERT INTO checking_account_main (date, transaction_id, description, category, type, amount, balance)
+                            VALUES (%s, %s, %s, %s, %s, %s, 0)
+                            """,
+                            (date_val, tx_id, desc, category, db_type_val, amount)
+                        )
+                except Exception as e:
+                    print(f"Sync checking failed: {e}")
+    conn.commit()
+    r_conn.commit()
+    cur.close()
+    r_cur.close()
+    conn.close()
+    r_conn.close()
+    print(f"Imported {inserted} entries from file: {f.filename}")
+    return redirect(url_for('add_data', role=role, origin=origin))
 @app.route('/', methods=('GET', 'POST'))
 def add_data():
     role = request.args.get('role', 'sale')
