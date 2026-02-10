@@ -96,7 +96,7 @@
 
         <div id="budget-page" class="page-section">
             
-            <iframe src="budget_section.html" title="Budget Section" style="width:100%; height:1100px; border:0;"></iframe>
+            <iframe id="budget-iframe" src="budget_section.html" title="Budget Section" style="width:100%; height:1100px; border:0;"></iframe>
         </div>
         </div>
 
@@ -105,9 +105,20 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js?v=4"></script>
-    <script src="budget_script.js?v=4"></script>
     <script src="budget.js?v=4"></script>
     <script src="company_budget.js?v=4"></script>
+    <script>
+    // Select correct budget page based on saved role
+    (function(){
+        try {
+            const iframe = document.getElementById('budget-iframe');
+            if (!iframe) return;
+            const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+            if (role === 'sale') iframe.src = 'budget_section_sale.html';
+            else iframe.src = 'budget_section.html';
+        } catch(e){ console.error('Failed to set budget iframe based on role', e); }
+    })();
+    </script>
     <script>
     function openCashEntry() {
         const role = localStorage.getItem('coffee_user_role') || 'sale';

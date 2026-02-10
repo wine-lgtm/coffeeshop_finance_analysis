@@ -182,6 +182,8 @@ function renderBudgetTable(budgets, tableBodyId) {
         return 0;
     });
 
+    const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+    const showActions = role === 'admin';
     sortedBudgets.forEach(budget => {
         const tr = document.createElement('tr');
         const safeMonth = String(budget.month).replace(/'/g, "\\'");
@@ -190,14 +192,16 @@ function renderBudgetTable(budgets, tableBodyId) {
         const isMainCategory = !budget.subcategory;
         const amountClassAttr = isMainCategory ? ' class="main-budget-amount"' : '';
 
+        const actionsHtml = showActions ? `
+                <button onclick="editBudget(${budget.id}, '${safeMonth}', '${safeCategory}', '${safeSubcategory}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class="fas fa-trash"></i></button>
+            ` : '<span style="color:#666;">No actions</span>';
+
         tr.innerHTML = `
             <td>${budget.month}</td>
             <td>${budget.subcategory || '-'}</td>
             <td${amountClassAttr}>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
-            <td>
-                <button onclick="editBudget(${budget.id}, '${safeMonth}', '${safeCategory}', '${safeSubcategory}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
-                <button onclick="deleteBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class="fas fa-trash"></i></button>
-            </td>
+            <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -215,6 +219,9 @@ function updateBudgetSummary(budgets, totalElementId) {
 }
 
 async function saveBudget() {
+    const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+    if (role !== 'admin') return alert('Only Admin can create or edit budgets.');
+
     const id = document.getElementById('budget_id').value;
     const month = document.getElementById('budget_month').value;
     const category = document.getElementById('budget_category').value;
@@ -255,6 +262,8 @@ async function saveBudget() {
 }
 
 async function deleteBudget(id) {
+    const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+    if (role !== 'admin') return alert('Only Admin can delete budgets.');
     if (!confirm('Are you sure you want to delete this budget?')) return;
 
     try {
@@ -273,6 +282,9 @@ async function deleteBudget(id) {
 }
 
 function editBudget(id, month, category, subcategory, amount) {
+    const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+    if (role !== 'admin') return alert('Only Admin can edit budgets.');
+
     document.getElementById('budget_id').value = id;
     document.getElementById('budget_month').value = month;
     const categorySelect = document.getElementById('budget_category');
