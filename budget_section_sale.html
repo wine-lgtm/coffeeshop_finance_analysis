@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Manage Budget (Sales)</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        <title>Manage Budget (Sales)</title>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="side.css">
+
+        <!-- FINAL layout fix -->
+        <style>
+            #budget-page-standalone {
+                width: 100%;
+                max-width: 1600px;
+                margin: 0 auto;
+                padding: 30px 40px;
+                box-sizing: border-box;
+                display: block;
+            }
+
+            #budget-page-standalone table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            #budget-page-standalone th,
+            #budget-page-standalone td {
+                padding: 12px 14px;
+                text-align: left;
+            }
+
+            #budget-page-standalone .card-grid {
+                width: 100%;
+            }
+
+            #budget-page-standalone .summary-card {
+                box-sizing: border-box;
+                padding: 36px;
+            }
+        </style>
+    </head>
+    <body>
+
+    <div id="budget-page-standalone">
+
+        <header class="dash-header">
+            <h1>Manage Budget</h1>
+        </header>
+
+        <!-- Compact month selector (doesn't change main frame layout) -->
+        <div style="margin:10px 0 18px 0; display:flex; align-items:center; gap:12px;">
+            <label for="month-selector" style="font-weight:600; color:#333;">Select month:</label>
+            <input id="month-selector" type="month" style="padding:8px 10px; border-radius:6px; border:1px solid #ddd;" />
+        </div>
+
+        <!-- SUMMARY CARDS -->
+     <div class="kpi-row" style="display:flex; gap:20px; margin-bottom:18px;">
+        <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+            <h4 style="color:#8B4513; margin:0 0 8px 0;">Total Budgeted</h4>
+            <div style="font-size:20px; color:#333;"> <span id="total-budgeted">MMK 0</span></div>
+        </div>
+        <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+            <h4 style="color:#8B4513; margin:0 0 8px 0;">Total Actual Spent</h4>
+            <div style="font-size:20px; color:#333;"> <span id="total-actual-spent">MMK 0</span></div>
+        </div>
+        <div class="summary-card" style="flex:1; padding:40px; background:#D2B48C; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); text-align:center;">
+        
+            <div style="font-size:18px; color:#333;"> <span id="overall-variance"></span></div>
+        </div>
+    </div>
+
+ 
+
+        <!-- CATEGORY BREAKDOWN (middle table with switch) -->
+        <div style="margin-top:30px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin:0;">Budget Breakdown by Main Categories</h3>
+                <div style="display:flex; gap:8px;">
+                    <button id="switch-cogs" style="padding:8px 12px; border-radius:8px; background:#0b74ff; color:white; border:none; cursor:pointer;">COGS</button>
+                    <button id="switch-opex" style="padding:8px 12px; border-radius:8px; background:#eee; border:none; cursor:pointer; color:#000">Operating Expenses</button>
+                </div>
+            </div>
+
+            <div style="background:white; border-radius:10px; padding:18px; border:1px solid #dbe7ff;">
+                <div id="category-header" style="margin-bottom:12px; font-weight:600; color:#333"> </div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#c96812; color:white;">
+                            <th style="padding:10px; text-align:left;">Subcategory</th>
+                            <th style="padding:10px; text-align:right;">Budgeted</th>
+                            <th style="padding:10px; text-align:right;">Actual Spent</th>
+                            <th style="padding:10px; text-align:right;">Variance</th>
+                            <th style="padding:10px; text-align:center;">Status</th>
+                            <th style="padding:10px; text-align:center;">Alert</th>
+                        </tr>
+                    </thead>
+                    <tbody id="category-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- KEY INSIGHTS -->
+        <div id="key-insights" style="margin-top:30px; background: linear-gradient(180deg,#fff7d6,#ffe8a8); border-radius:10px; padding:18px; border:3px solid #ffd24d; box-shadow:0 6px 18px rgba(0,0,0,0.04);">
+            <h3 style="color:#0b63c4; margin-top:0;">Key Insights</h3>
+
+
+            <div id="insights-most-over" style="margin-bottom:10px; font-weight:600; color:#c9302c;">Most Over-Budget Item: (loading...)</div>
+
+            <div id="insights-summary" style="margin-bottom:10px; color:#222;">Summary of Budget Status: (loading...)</div>
+
+            <div id="insights-no-budget" style="margin-bottom:10px; color:#222;">No Budget Creation: (loading...)</div>
+
+            <div id="insights-alerts" style="margin-bottom:10px; color:#222;">Alerts: (loading...)</div>
+
+            <div>
+                <h4 style="margin:8px 0 6px 0;">Recommendations:</h4>
+                <ul id="insights-recommendations" style="margin:0 0 0 18px; color:#222;"><li>Recommendations: (loading...)</li></ul>
+            </div>
+        </div>
+
+        <!-- COMPANY BUDGET SECTION (kept but hidden by default; scripts will respect role checks) -->
+        <div id="company-budget-section" class="manage-expense-card" style="display:none; margin-top:30px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 id="company-form-title">Add Company Budget</h3>
+                <div style="display:flex; gap:10px;">
+                    <input type="month" id="company_month_filter">
+                    <button onclick="loadCompanyBudgets()" class="add-expense-btn">Filter</button>
+                </div>
+            </div>
+
+            <input type="hidden" id="company_budget_id">
+
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:15px;">
+                <input type="month" id="company_budget_month">
+                <input type="number" id="company_budget_amount" placeholder="0.00">
+                <div style="display:flex; gap:5px;">
+                    <button onclick="saveCompanyBudget()" class="add-expense-btn">Save</button>
+                    <button onclick="clearCompanyForm()" id="btn-cancel-edit-company"
+                            style="display:none; background:#999; color:white; border:none;
+                                   padding:0 15px; border-radius:14px;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <h3 style="margin-top:30px;">Company Budget List</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Total Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="company-budget-table-body"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="newscript.js?v=5"></script>
+    <script src="budget.js?v=5"></script>
+    <script src="company_budget.js?v=5"></script>
+
+    <script>
+        // Fixed API base so it works from both localhost and Go Live (127.0.0.1). Backend must run on port 8000.
+        const API_BASE = 'http://127.0.0.1:8000';
+
+        // Populate the top KPI blocks for the selected month (falls back to current month)
+        let selectedMonth = null; // format YYYY-MM
+        let currentCategory = 'COGS';
+
+        function _getCurrentMonthRange() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const currentMonth = `${y}-${m}`;
+            const effective = selectedMonth || currentMonth;
+            const [ey, em] = effective.split('-').map(v => parseInt(v, 10));
+            const month = `${String(ey)}-${String(em).padStart(2, '0')}`;
+            const start = `${month}-01`;
+            const lastDay = new Date(ey, em, 0).getDate();
+            const end = `${month}-${String(lastDay).padStart(2, '0')}`;
+            return { month, start, end };
+        }
+
+        async function updateTopKPIs() {
+            const elBudgeted = document.getElementById('total-budgeted');
+            const elActual = document.getElementById('total-actual-spent');
+            const elVar = document.getElementById('overall-variance');
+            if (!elBudgeted || !elActual || !elVar) return;
+
+            const { month, start, end } = _getCurrentMonthRange();
+
+            // 1) Total Budgeted: sum of admin overall budgets for current month
+            let totalBudgeted = 0;
+            try {
+                const res = await fetch(`${API_BASE}/api/overall_budgets?month=${month}`);
+                if (res.ok) {
+                    const budgets = await res.json();
+                    totalBudgeted = budgets.reduce((s, b) => s + parseFloat(b.amount || 0), 0);
+                }
+            } catch (e) { console.error('Failed to load overall budgets for KPI:', e); }
+            elBudgeted.innerText = `MMK ${totalBudgeted.toLocaleString()}`;
+
+            // 2) Total Actual Spent (use financial-summary breakdown for month)
+            let actualSpent = 0;
+            try {
+                const sumRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
+                if (sumRes.ok) {
+                    const data = await sumRes.json();
+                    const breakdown = data.breakdown || {};
+                    const cogs = parseFloat(breakdown.cogs || 0);
+                    const operating = parseFloat(breakdown.operating || 0);
+                    const payroll = parseFloat(breakdown.payroll || 0);
+                    actualSpent = cogs + operating + payroll;
+                }
+            } catch (e) { console.error('Failed to load financial summary:', e); }
+            elActual.innerText = `MMK ${actualSpent.toLocaleString()}`;
+
+            // 3) Variance
+            const variance = totalBudgeted - actualSpent;
+            const percent = totalBudgeted ? (variance / totalBudgeted) * 100 : 0;
+            const absVar = Math.abs(variance);
+            const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+            const sign = variance >= 0 ? '' : '-';
+            elVar.innerHTML = `${sign}MMK ${absVar.toLocaleString()} <div style="font-size:0.9rem; color:#666; margin-top:6px;">(${Math.abs(percent).toFixed(1)}% ${status})</div>`;
+        }
+
+        async function updateKeyInsights() {
+            const mostEl = document.getElementById('insights-most-expensive');
+            const sumEl = document.getElementById('insights-summary');
+            const alertsEl = document.getElementById('insights-alerts');
+            const recEl = document.getElementById('insights-recommendations');
+            let topOverMention = null;
+            try {
+                const { month, start, end } = _getCurrentMonthRange();
+                const url = `${API_BASE}/api/key-insights?start_date=${start}&end_date=${end}&month=${month}&sales_only=true&source=both`;
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt || `${res.status} ${res.statusText}`);
+                }
+                const data = await res.json();
+
+                const mostOverEl = document.getElementById('insights-most-over');
+                try {
+                    const allEntries = data.entries || [];
+                    const overEntries = allEntries
+                        .filter(e => {
+                            if (!e) return false;
+                            const rawSub = (e.subcategory != null) ? String(e.subcategory).trim() : '';
+                            const rawCat = (e.category != null) ? String(e.category).trim() : '';
+                            const lowerSub = rawSub.toLowerCase();
+                            const lowerCat = rawCat.toLowerCase();
+                            const isMain = (rawSub === '') || lowerSub === '(main)' || lowerSub === 'main' || lowerSub === lowerCat;
+                            if (isMain) return false;
+                            return e.status === 'Over Budget' && (Number(e.actual || 0) > 0);
+                        })
+                        .map(e => ({...e, overrun: Number((Number(e.actual || 0) - Number(e.budgeted || 0)).toFixed(2))}));
+                    overEntries.sort((a,b) => b.overrun - a.overrun);
+                    if (mostOverEl) {
+                        if (!overEntries || overEntries.length === 0) {
+                            mostOverEl.innerText = 'Most Over-Budget Item: No over-budget items this month.';
+                        } else {
+                            const top = overEntries[0];
+                            const rawActual = Number(top.actual || 0);
+                            const computedActual = Number(top.budgeted || 0) + Number(top.overrun || 0);
+                            let displayedActual = 0;
+                            if (rawActual && computedActual) {
+                                if (Math.abs(rawActual - computedActual) < 0.5) displayedActual = rawActual / 2;
+                                else displayedActual = rawActual;
+                            } else {
+                                displayedActual = rawActual || computedActual || 0;
+                            }
+                            mostOverEl.innerHTML = `Most Over-Budget Item: ${top.category || 'Unknown'} / ${top.subcategory || '(main)'} —  (Budgeted: MMK ${Number(top.budgeted || 0).toLocaleString()}, Actual: MMK ${Number(displayedActual).toLocaleString()})`;
+                            topOverMention = `Focus on the over-budget item (${top.category} / ${top.subcategory || '(main)'}). Consider delaying non-essential purchases.`;
+                        }
+                    }
+                } catch (e) {
+                    if (mostOverEl) mostOverEl.innerText = 'Most Over-Budget Item: (error computing overrun)';
+                }
+
+                if (sumEl) {
+                    const entries = data.entries || [];
+                    const summaryCounts = {
+                        'Under Budget': {count: 0, total: 0},
+                        'Over Budget': {count: 0, total: 0},
+                        'No Budget Creation': {count: 0, total: 0}
+                    };
+
+                    entries.forEach(e => {
+                        const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                        if (!subcat) return;
+                        const budgeted = Number(e.budgeted || 0);
+                        const actual = Number(e.actual || 0);
+                        const variance = budgeted - actual;
+                        let st;
+                        if (!e.budgeted || budgeted === 0) st = 'No Budget Creation';
+                        else st = (variance < 0) ? 'Over Budget' : 'Under Budget';
+                        if (st === 'Under Budget') {
+                            summaryCounts['Under Budget'].count += 1;
+                            summaryCounts['Under Budget'].total += Math.max(0, variance);
+                        } else if (st === 'Over Budget') {
+                            summaryCounts['Over Budget'].count += 1;
+                            summaryCounts['Over Budget'].total += Math.max(0, -variance);
+                        } else if (st === 'No Budget Creation') {
+                            summaryCounts['No Budget Creation'].count += 1;
+                            summaryCounts['No Budget Creation'].total += actual;
+                        }
+                    });
+
+                    const ub = summaryCounts['Under Budget'];
+                    const ob = summaryCounts['Over Budget'];
+
+                    let explicitOverrunTotal = 0;
+                    try {
+                        const budgetMap = {};
+                        (entries || []).forEach(e => {
+                            const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                            if (!subcat) return;
+                            const catRaw = (e.category != null) ? String(e.category).trim() : '';
+                            const key = `${catRaw.toLowerCase()}||${subcat}`;
+                            budgetMap[key] = (budgetMap[key] || 0) + Number(e.budgeted || 0);
+                        });
+
+                        const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true&source=reporting`);
+                        const expMap = {};
+                        if (expRes.ok) {
+                            const expList = await expRes.json();
+                            expList.forEach(it => {
+                                const catKey = (it.category != null) ? String(it.category).trim().toLowerCase() : '';
+                                const sub = (it.subcategory != null) ? String(it.subcategory).trim() : '';
+                                if (!sub) return;
+                                const key = `${catKey}||${sub}`;
+                                expMap[key] = (expMap[key] || 0) + Number(it.total || 0);
+                            });
+                        }
+
+                        Object.keys(budgetMap).forEach(k => {
+                            const budgeted = budgetMap[k] || 0;
+                            const actual = expMap[k] || 0;
+                            if (budgeted > 0 && actual > budgeted) {
+                                explicitOverrunTotal += (actual - budgeted);
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Failed to compute explicitOverrunTotal:', err);
+                    }
+
+                    sumEl.innerHTML = `Summary of Budget Status:<br>` +
+                        `- <span style="color:green; font-weight:700;">Under Budget:</span> ${ub.count} subcategories — Total savings: MMK ${Math.round(ub.total).toLocaleString()}.<br>` +
+                        `- <span style="color:red; font-weight:700;">Over Budget:</span> ${ob.count} subcategories — Total overrun: MMK ${Math.round(explicitOverrunTotal).toLocaleString()}.`;
+
+                    const noBudgetEl = document.getElementById('insights-no-budget');
+                    if (noBudgetEl) {
+                        const noBudgetGlobal = new Set();
+                        const noBudgetByCat = {
+                            'COGS': {subs: new Set(), total: 0},
+                            'Operating expense': {subs: new Set(), total: 0}
+                        };
+
+                        (data.entries || []).forEach(e => {
+                            const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
+                            if (!subcat) return;
+                            const budgeted = Number(e.budgeted || 0);
+                            const actual = Number(e.actual || 0);
+                            const catRaw = (e.category != null) ? String(e.category).trim().toLowerCase() : '';
+                            let key = null;
+                            if (catRaw.includes('cogs')) key = 'COGS';
+                            else if (catRaw.includes('operat')) key = 'Operating expense';
+
+                            if (!budgeted || budgeted === 0) {
+                                if (!key) return;
+                                const globalKey = `${key}||${subcat}`;
+                                if (!noBudgetGlobal.has(globalKey)) {
+                                    noBudgetGlobal.add(globalKey);
+                                }
+                                if (!noBudgetByCat[key].subs.has(subcat)) {
+                                    noBudgetByCat[key].subs.add(subcat);
+                                    noBudgetByCat[key].total += actual;
+                                }
+                            }
+                        });
+
+                        noBudgetEl.innerHTML = `No Budget Creation: ${noBudgetGlobal.size} subcategories total — ` +
+                            `COGS: ${noBudgetByCat['COGS'].subs.size} subcategories ,` +
+                            `Operating expense: ${noBudgetByCat['Operating expense'].subs.size} subcategories .`;
+                    }
+                }
+
+                if (alertsEl) {
+                    alertsEl.innerHTML = `Alerts: ${data.alerts || 0} active alert(s). Review over-budget items to avoid further overruns.`;
+                }
+
+                if (recEl) {
+                    const recs = data.recommendations || [];
+                    if (recs.length === 0) recEl.innerHTML = '<li>No recommendations available.</li>';
+                    else recEl.innerHTML = recs.map(r => `<li>${r}</li>`).join('');
+                }
+
+            } catch (err) {
+                console.error('Failed to load key insights:', err);
+                const msg = (err && err.message) ? err.message : 'Failed to load key insights.';
+           
+                if (sumEl) sumEl.innerText = `Summary of Budget Status: ${msg}`;
+                if (alertsEl) alertsEl.innerText = `Alerts: ${msg}`;
+                if (recEl) recEl.innerHTML = `<li>${msg}</li>`;
+            }
+        }
+
+        function _normalizeCategory(cat) {
+            if (!cat) return '';
+            const c = String(cat).trim();
+            if (c.toLowerCase() === 'operating expense') return 'Operating expense';
+            return c;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const monthInput = document.getElementById('month-selector');
+            if (monthInput) {
+                const now = new Date();
+                const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                selectedMonth = defaultMonth;
+                monthInput.value = defaultMonth;
+                monthInput.addEventListener('change', function() {
+                    if (this.value) selectedMonth = this.value;
+                    updateTopKPIs();
+                    loadCategoryBreakdown(currentCategory);
+                    updateKeyInsights();
+                });
+            }
+
+            updateTopKPIs();
+            updateKeyInsights();
+            setInterval(updateTopKPIs, 60000);
+            setInterval(updateKeyInsights, 60000);
+
+            const btnCogs = document.getElementById('switch-cogs');
+            const btnOpex = document.getElementById('switch-opex');
+            const tbody = document.getElementById('category-table-body');
+            const headerEl = document.getElementById('category-header');
+            if (!btnCogs || !btnOpex || !tbody || !headerEl) return;
+
+            async function loadCategoryBreakdown(categoryKey) {
+                const { month, start, end } = _getCurrentMonthRange();
+                headerEl.innerText = `1. ${categoryKey === 'COGS' ? 'COGS (Cost of Goods Sold)' : 'Operating expense (Operating Expenses)'} for ${month}`;
+
+                let budgets = [];
+                try {
+                    const res = await fetch(`${API_BASE}/api/budgets?month=${month}`);
+                    if (res.ok) budgets = await res.json();
+                } catch (e) { console.error('Failed to fetch budgets:', e); }
+
+                const rows = budgets.filter(b => String(b.category || '').trim().toLowerCase() === String(categoryKey || '').trim().toLowerCase());
+                const totalBudgeted = rows.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+
+                let actualBySubcategory = {};
+                try {
+                    const expRes = await fetch(`${API_BASE}/api/expense-by-subcategory?start_date=${start}&end_date=${end}&sales_only=true&source=reporting`);
+                    if (expRes.ok) {
+                        const expList = await expRes.json();
+                        const byCat = {};
+                        expList.forEach(item => {
+                            const catKey = _normalizeCategory(item.category);
+                            if (catKey !== categoryKey) return;
+                            const sub = (item.subcategory != null && item.subcategory !== '') ? String(item.subcategory).trim() : '';
+                            if (!byCat[sub]) byCat[sub] = 0;
+                            byCat[sub] += parseFloat(item.total || 0);
+                        });
+                        actualBySubcategory = byCat;
+                    }
+                } catch (e) { console.error('Failed to fetch expense-by-subcategory:', e); }
+
+                tbody.innerHTML = '';
+                if (rows.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:16px;">No budgets found for ${month} / ${categoryKey}</td></tr>`;
+                    return;
+                }
+
+                let subList = [];
+                try {
+                    const allowed = (typeof allowedSubcategoriesByCategory !== 'undefined') ? allowedSubcategoriesByCategory[categoryKey] || [] : [];
+                    subList = Array.from(new Set([
+                        ...(allowed || []),
+                        ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== ''),
+                        ...Object.keys(actualBySubcategory).filter(s => s !== '')
+                    ]));
+                } catch (e) {
+                    subList = Array.from(new Set([
+                        ...rows.map(r => r.subcategory).filter(s => s && String(s).trim() !== ''),
+                        ...Object.keys(actualBySubcategory).filter(s => s !== '')
+                    ]));
+                }
+
+                const actualMain = Object.keys(actualBySubcategory).reduce((sum, sub) => sum + (actualBySubcategory[sub] || 0), 0);
+
+                const mainRow = rows.find(r => r.subcategory === null || r.subcategory === undefined || String(r.subcategory).trim() === '');
+                if (mainRow) {
+                    const budgeted = parseFloat(mainRow.amount || 0);
+                    const actual = Math.round(actualMain * 100) / 100;
+                    const variance = Math.round((budgeted - actual) * 100) / 100;
+                    let status = (variance < 0) ? 'Over Budget' : 'Under Budget';
+                    const tr = document.createElement('tr');
+                    const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
+                    tr.innerHTML = `
+                        <td style="padding:10px">${mainRow.category} (Main)</td>
+                        <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:center">${status}</td>
+                        <td style="padding:10px; text-align:center">${alertText}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+
+                subList.forEach(sub => {
+                    const r = rows.find(rr => String(rr.subcategory) === String(sub));
+                    const hasBudget = !!r;
+                    const budgeted = hasBudget ? parseFloat(r.amount || 0) : 0;
+                    const actual = Math.round((actualBySubcategory[sub] || 0) * 100) / 100;
+                    const variance = Math.round((budgeted - actual) * 100) / 100;
+                    let status = '';
+                    if (!hasBudget) {
+                        status = 'No Budget Creation';
+                    } else {
+                        status = (variance < 0) ? 'Over Budget' : 'Under Budget';
+                    }
+                    const tr = document.createElement('tr');
+                    const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
+                    tr.innerHTML = `
+                        <td style="padding:10px">${sub}</td>
+                        <td style="padding:10px; text-align:right">MMK ${budgeted.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:right">MMK ${actual.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:right">MMK ${variance.toLocaleString()}</td>
+                        <td style="padding:10px; text-align:center">${status}</td>
+                        <td style="padding:10px; text-align:center">${alertText}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            btnCogs.addEventListener('click', function() {
+                btnCogs.style.background = '#0b74ff'; btnCogs.style.color = '#fff';
+                btnOpex.style.background = '#eee'; btnOpex.style.color = '#000';
+                currentCategory = 'COGS';
+                loadCategoryBreakdown('COGS');
+            });
+            btnOpex.addEventListener('click', function() {
+                btnOpex.style.background = '#0b74ff'; btnOpex.style.color = '#fff';
+                btnCogs.style.background = '#eee'; btnCogs.style.color = '#000';
+                currentCategory = 'Operating expense';
+                loadCategoryBreakdown('Operating expense');
+            });
+
+            loadCategoryBreakdown('COGS');
+        });
+    </script>
+
+    </body>
+    </html>
