@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 # Change this:
-DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/coffeeshop_cashflow"
+DATABASE_URL = "postgresql://postgres:Prim#2504@127.0.0.1:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 
 # --- 1. GET DATE BOUNDS (Fixes the "Show all data from start" issue) ---
@@ -367,3 +367,4 @@ def download_pdf(start_date: date, end_date: date):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+

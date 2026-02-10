@@ -1,4 +1,3 @@
-
 const allowedSubcategoriesByCategory = {
     'COGS': [
         'Bakery Payment',
@@ -319,5 +318,8 @@ function clearBudgetForm() {
     document.getElementById('form-title').innerText = 'Add New Budget';
     document.getElementById('btn-cancel-edit').style.display = 'none';
 }
+
+
+
 
 

@@ -762,3 +762,64 @@ def get_key_insights(
         'recommendations': recommendations,
         'summary': summary_counts
     }
+
+
+@router.get("/api/expense-by-subcategory")
+def expense_by_subcategory(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    sales_only: bool = Query(False),
+    source: str = Query('both')
+):
+    """Return aggregated expense totals by (category, subcategory).
+    `source` can be 'reporting', 'entries', or 'both'.
+    """
+    s = (source or 'both').lower()
+    results = {}
+
+    if s in ('reporting', 'both'):
+        q = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(amount) AS total
+            FROM (
+                SELECT category, description, amount, date FROM checking_account_main
+                UNION ALL
+                SELECT category, description, amount, date FROM checking_account_secondary
+                UNION ALL
+                SELECT category, vendor AS description, amount, date FROM credit_card_account
+            ) AS combined
+            WHERE date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(description), '')
+        """)
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(q, {"start": start_date, "end": end_date}).mappings().all()
+                for r in rows:
+                    cat = (r.get('category') or '').strip()
+                    sub = (r.get('subcategory') or '').strip()
+                    key = (cat, sub)
+                    results[key] = results.get(key, 0) + abs(float(r.get('total') or 0))
+        except Exception:
+            pass
+
+    if s in ('entries', 'both'):
+        q_entries = text("""
+            SELECT category, COALESCE(TRIM(description), '') AS subcategory, SUM(balance) AS total
+            FROM entries
+            WHERE entry_type = 'expense' AND date BETWEEN :start AND :end
+            GROUP BY category, COALESCE(TRIM(description), '')
+        """)
+        try:
+            with cafe_engine.connect() as conn:
+                rows = conn.execute(q_entries, {"start": start_date, "end": end_date}).mappings().all()
+                for r in rows:
+                    cat = (r.get('category') or '').strip()
+                    sub = (r.get('subcategory') or '').strip()
+                    key = (cat, sub)
+                    results[key] = results.get(key, 0) + abs(float(r.get('total') or 0))
+        except Exception:
+            pass
+
+    out = []
+    for (cat, sub), total in results.items():
+        out.append({"category": cat, "subcategory": sub, "total": round(total, 2)})
+    return out
