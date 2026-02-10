@@ -83,7 +83,7 @@ def purge_imported_checking_entries():
                 balance = row.get("balance")
                 balance_val = float(balance) if balance not in (None, "") else None
                 if date_str and description and category and balance_val is not None:
-                    cur.execute(
+                 #   cur.execute(
                         """
                         DELETE FROM entries
                         WHERE date = %s
@@ -95,7 +95,7 @@ def purge_imported_checking_entries():
                           AND COALESCE(staff_name,'') = ''
                         """,
                         (date_str, category, description, entry_type, balance_val),
-                    )
+                  #  )
         conn.commit()
     except Exception:
         pass
@@ -106,7 +106,7 @@ def reset_entries_from_dataset():
     import csv, os
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM entries")
+   # cur.execute("DELETE FROM entries")
     csv_path = os.path.join(os.path.dirname(__file__), "checking_account_main.csv")
     with open(csv_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
