@@ -220,7 +220,7 @@
                 <input type="date" name="date" value="{{ today }}">
             </div>
             <div>
-                <label>Amount (MMK)</label>
+                <label>Amount ($)</label>
                 <input type="number" name="balance" step="0.01" placeholder="0.00" required>
             </div>
             <div class="full-width">
@@ -277,7 +277,7 @@
                 <input type="date" name="date" value="{{ today }}">
             </div>
             <div>
-                <label>Amount (MMK)</label>
+                <label>Amount ($)</label>
                 <input type="number" name="balance" id="balanceInput" step="0.01" placeholder="0.00" required>
             </div>
             
@@ -349,7 +349,7 @@
                     <th>Category</th>
                     <th>Description</th>
                     <th>Details</th>
-                    <th class="amount-col">Amount (MMK)</th>
+                    <th class="amount-col">Amount ($)</th>
                     <th>Staff</th>
                     <th>Action</th>
                 </tr>
@@ -362,7 +362,7 @@
                     <td>{{ t.category }}</td>
                     <td>{{ t.description or '-' }}</td>
                     <td>{{ t.details or '-' }}</td>
-                    <td class="amount-col">{{ "%.2f"|format(t.balance) }}</td>
+                    <td class="amount-col">{{ "%.2f"|format(t.balance or 0) }}</td>
                     <td>{{ t.staff_name or '-' }}</td>
                     <td>
                         {% if role == 'admin' %}
