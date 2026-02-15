@@ -186,7 +186,6 @@ td { padding: 18px; border-bottom: 1px solid #fcfcfc; color: #444; font-size: 14
 .income-row-checkbox { transform: scale(1.1);
      cursor: pointer; }
 
-<<<<<<< HEAD
 /* Report Page Styling - FULL FIX */
 .intel-report {
     animation: fadeIn 0.5s ease-out;
@@ -314,7 +313,6 @@ td { padding: 18px; border-bottom: 1px solid #fcfcfc; color: #444; font-size: 14
     from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
-=======
 /* Report Page Styling */
 .report-container {
     background: white;
@@ -341,4 +339,3 @@ td { padding: 18px; border-bottom: 1px solid #fcfcfc; color: #444; font-size: 14
     box-shadow: 0 10px 20px rgba(0,0,0,0.05);
     border-color: var(--light-coffee);
 }
->>>>>>> origin/master
