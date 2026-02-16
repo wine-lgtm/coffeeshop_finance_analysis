@@ -81,7 +81,8 @@
                 <div class="summary-card dark-espresso" id="balance-card"><h4>Current Balance</h4><p id="card-remaining">$0</p></div>
                 <div class="summary-card caramel-brown"><h4>Total Expenses</h4><p id="card-total">$0</p></div>
                 <div class="summary-card mocha-light"><h4>Total Income</h4><p id="card-income">$0</p></div>
-                <div class="summary-card mocha-light"><h4>Budget</h4><p id="card-budget">$1000000</p></div>
+                <div class="summary-card mocha-light"><h4>Budget</h4><p id="total-budgeted">$0</p></div>
+                
             </div>
             <div class="table-container">
                 <h3>Recent Activity</h3>
@@ -107,6 +108,50 @@
     <script src="newscript.js?v=4"></script>
     <script src="budget.js?v=4"></script>
     <script src="company_budget.js?v=4"></script>
+    <script>
+    // Show total budgeted amount in dashboard for admin only
+    async function updateDashboardBudgetCard() {
+        // Always show the budgeted amount for all roles (admin and sale)
+      
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const monthStr = `${y}-${m}`;
+        try {
+            // Fetch overall budgets for the current month (admin overall budgets)
+            const response = await fetch(`http://127.0.0.1:8000/api/overall_budgets?month=${monthStr}`);
+            let totalBudgeted = 0;
+            if (response.ok) {
+                const budgets = await response.json();
+                // overall_budgets may return one or more rows; sum their amounts
+                totalBudgeted = budgets.reduce((s, b) => s + parseFloat(b.amount || 0), 0);
+            }
+            document.getElementById('total-budgeted').innerText = `$ ${totalBudgeted.toLocaleString()}`;
+        } catch (e) {
+            console.error('Failed to load overall budgets for KPI:', e);
+            document.getElementById('total-budgeted').innerText = 'N/A';
+        }
+}
+
+    
+    // Call on page load for dashboard section
+    window.addEventListener('DOMContentLoaded', updateDashboardBudgetCard);
+
+    // Ensure dashboard budget card updates when dashboard section is shown
+    function showSection(sectionId) {
+        // Hide all page sections
+        document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active-section'));
+        // Show the requested section
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.add('active-section');
+            // If dashboard is shown, update the budget card
+            if (sectionId === 'dashboard') {
+                updateDashboardBudgetCard();
+            }
+        }
+    }
+    </script>
     <script>
     // Select correct budget page based on saved role
     (function(){
@@ -139,8 +184,24 @@
             // Ensure section is shown if hash exists (fallback for race conditions)
             const section = window.location.hash.substring(1);
             if (typeof showSection === 'function') {
-                setTimeout(() => showSection(section), 100);
+                setTimeout(() => {
+                    showSection(section);
+                    if (section === 'dashboard') updateDashboardBudgetCard();
+                }, 100);
             }
+        }
+
+        // Attach login form handler to update dashboard after login
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+                setTimeout(() => {
+                    // After login, when dashboard is shown, update the budget card
+                    if (document.getElementById('dashboard').classList.contains('active-section')) {
+                        updateDashboardBudgetCard();
+                    }
+                }, 500);
+            });
         }
     };
 </script>

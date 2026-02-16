@@ -135,7 +135,7 @@ def _require_overall_budget_for_month(conn, month: str):
     if overall_amount is None:
         raise HTTPException(
             status_code=400,
-            detail=f"No overall budget set for {month}. Please add an overall budget for this month before adding category budgets.",
+            detail=f"No overall budget set for {month}. Please add an overall budget first.",
         )
 
 
@@ -211,7 +211,7 @@ def create_budget(budget: BudgetModel):
                     status_code=400,
                     detail=(
                         f"No main {budget.category} budget found for {budget.month}. "
-                        f"Please create the main {budget.category} budget first, then add sub-category budgets."
+                        f"Please create the main {budget.category} budget first."
                     ),
                 )
 
@@ -240,7 +240,7 @@ def create_budget(budget: BudgetModel):
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"This sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
+                        f"Sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
                         f"Please increase the {budget.category} budget or reduce the sub-category amount."
                     ),
                 )
@@ -385,7 +385,7 @@ def update_budget(budget_id: int, budget: BudgetModel):
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"This sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
+                        f"Sub-category budget exceeds the {budget.category} budget of ${formatted_main}.\n"
                         f"Please increase the {budget.category} budget or reduce the sub-category amount."
                     ),
                 )
@@ -452,8 +452,19 @@ def update_budget(budget_id: int, budget: BudgetModel):
 
 @router.delete("/api/budgets/{budget_id}")
 def delete_budget(budget_id: int):
-    query = text("DELETE FROM budgets WHERE id = :id")
+    from datetime import date
+    today = date.today()
+    current_month = today.strftime("%Y-%m")
     with engine.connect() as conn:
+        # Get the month and subcategory for this budget
+        row = conn.execute(text("SELECT month, subcategory FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Budget not found")
+        month, subcategory = row[0], row[1]
+        # Prevent deletion of main category budget for current month
+        if month == current_month and (subcategory is None or str(subcategory).strip() == ""):
+            raise HTTPException(status_code=400, detail="Cannot delete ongoing budget")
+        query = text("DELETE FROM budgets WHERE id = :id")
         result = conn.execute(query, {"id": budget_id})
         conn.commit()
         if result.rowcount == 0:
@@ -599,8 +610,18 @@ def update_overall_budget(budget_id: int, budget: OverallBudgetModel):
 
 @router.delete("/api/overall_budgets/{budget_id}")
 def delete_overall_budget(budget_id: int):
-    query = text("DELETE FROM overall_budgets WHERE id = :id")
+    from datetime import date
+    today = date.today()
+    current_month = today.strftime("%Y-%m")
     with engine.connect() as conn:
+        # Get the month for this overall budget
+        row = conn.execute(text("SELECT month FROM overall_budgets WHERE id = :id"), {"id": budget_id}).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Overall budget not found")
+        month = row[0]
+        if month == current_month:
+            raise HTTPException(status_code=400, detail="You cannot delete the overall budget for the current month. You may only edit it.")
+        query = text("DELETE FROM overall_budgets WHERE id = :id")
         result = conn.execute(query, {"id": budget_id})
         conn.commit()
         if result.rowcount == 0:
