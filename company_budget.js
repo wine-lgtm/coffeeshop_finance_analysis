@@ -37,7 +37,7 @@ function renderCompanyBudgetTable(budgets) {
 
         tr.innerHTML = `
             <td>${budget.month}</td>
-            <td>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
+            <td>$ ${parseFloat(budget.amount).toLocaleString()}</td>
             <td>${actions}</td>
         `;
         tbody.appendChild(tr);
@@ -48,7 +48,7 @@ function updateCompanyBudgetSummary(budgets) {
     const total = budgets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
     const totalEl = document.getElementById('company-budget-total');
     if (totalEl) {
-        totalEl.innerText = `MMK ${total.toLocaleString()}`;
+        totalEl.innerText = `$ ${total.toLocaleString()}`;
     }
 }
 

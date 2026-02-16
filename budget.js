@@ -200,7 +200,7 @@ function renderBudgetTable(budgets, tableBodyId) {
         tr.innerHTML = `
             <td>${budget.month}</td>
             <td>${budget.subcategory || '-'}</td>
-            <td${amountClassAttr}>MMK ${parseFloat(budget.amount).toLocaleString()}</td>
+            <td${amountClassAttr}>$ ${parseFloat(budget.amount).toLocaleString()}</td>
             <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
@@ -245,7 +245,7 @@ async function saveBudget() {
         });
 
         if (response.ok) {
-            // alert('Budget saved successfully');
+            alert('localhost:3000 says\n\nBudget saved successfully');
             clearBudgetForm();
             loadBudgets();
         } else {
@@ -272,9 +272,17 @@ async function deleteBudget(id) {
         });
 
         if (response.ok) {
+            alert('localhost:3000 says\n\nBudget deleted successfully');
             loadBudgets();
         } else {
-            alert('Error deleting budget');
+            let msg = 'Error deleting budget';
+            try {
+                const error = await response.json();
+                if (error && error.detail === 'Cannot delete ongoing budget') {
+                    msg = 'Cannot delete ongoing budget';
+                }
+            } catch (e) {}
+            alert(msg);
         }
     } catch (error) {
         console.error('Error deleting budget:', error);

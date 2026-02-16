@@ -7,13 +7,14 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="side.css">
+    <!-- <link rel="stylesheet" href="side.css"> -->
 
     <style>
-        /* Page-specific override: hide the global sidebar when this page is opened directly */
-        .sidebar { display: none !important; }
         /* Reset dashboard margin so content uses full width */
         #dashboard-section { margin-left: 0 !important; padding: 40px; }
+        html, body {
+            overflow-y: hidden !important;
+        }
     </style>
 
     <style>
@@ -33,6 +34,204 @@
     border: 1px solid #28a745;
     color: #155724;
 }
+/* ===== Page Background ===== */
+#dashboard-section {
+    background: linear-gradient(135deg, #f5f7fa, #fcede1);
+    min-height: 100vh;
+    padding: 40px;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* ===== Header ===== */
+.dash-header {
+    background: white;
+    padding: 22px 28px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.dash-header h1 {
+    font-size: 22px;
+    color: #2c3e50;
+    flex-grow: 1;
+}
+
+/* ===== Buttons ===== */
+button {
+    border-radius: 10px;
+    transition: all 0.25s ease;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Lift animation */
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+/* Save button */
+.add-expense-btn {
+    background: linear-gradient(135deg, #28a745, #34d058);
+    border: none;
+    color: white;
+}
+
+.add-expense-btn:hover {
+    background: linear-gradient(135deg, #218838, #2ecc71);
+}
+
+/* Cancel button */
+#btn-cancel-edit {
+    background: #999;
+    color: white;
+}
+
+#btn-cancel-edit:hover {
+    background: #777;
+}
+
+/* ===== Main Card ===== */
+.manage-expense-card {
+    background: white;
+    padding: 26px;
+    border-radius: 20px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.05);
+    transition: 0.3s ease;
+}
+
+.manage-expense-card:hover {
+    box-shadow: 0 14px 34px rgba(0,0,0,0.08);
+}
+
+/* ===== Input Container Hover ===== */
+.expense-table-input {
+    padding: 18px;
+    border-radius: 16px;
+    transition: 0.25s ease;
+}
+
+.expense-table-input:hover {
+    background: #f8fbff;
+}
+
+/* ===== Inputs & Selects ===== */
+input[type="month"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #dcdfe3;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    background: white;
+}
+
+/* Focus glow */
+input:focus,
+select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+    background-color: #fafdff;
+}
+
+/* Month inputs highlight */
+#budget_month,
+#budget_month_filter {
+    background-color: #f0fff4;
+    border: 1px solid #28a745;
+    color: #155724;
+}
+
+/* ===== Labels ===== */
+label {
+    letter-spacing: 0.4px;
+}
+
+/* ===== Titles ===== */
+h3 {
+    margin-top: 10px;
+    color: #2c3e50;
+}
+
+h4 {
+    color: #34495e;
+}
+
+/* ===== Totals Badge ===== */
+#cogs-total,
+#operating-total {
+    font-weight: bold;
+    color: #27ae60;
+}
+
+/* ===== Tables ===== */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+thead {
+    background: linear-gradient(100deg, #802E22, #883e32);
+    color: white;
+}
+
+th {
+    padding: 14px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 15px;
+}
+
+/* Row hover highlight */
+tbody tr {
+    transition: all 0.2s ease;
+}
+
+tbody tr:hover {
+    background-color: #f8fbff;
+    transform: scale(1.01);
+}
+
+/* ===== Highlight Main Budget Amount ===== */
+.main-budget-amount {
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff3cd, #ffe8a1);
+    color: #2c3e50;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+/* ===== Action Buttons in Table ===== */
+td button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    transition: 0.2s ease;
+}
+
+td button:hover {
+    transform: scale(1.05);
+}
+
     </style>
 </head>
 
@@ -44,10 +243,10 @@
             <header class="dash-header">
                 <h1>Category Budget Management</h1>
                 <button onclick="window.location.href='overall_budget.html'; event.stopPropagation();" 
-                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+                style="background: #93BD57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
             Manage Overall Budget
         </button>
-                <button onclick="window.location.href='budget_section.html'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
+                <button onclick="window.location.href='budget_section.html'" style="background: #802E22; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
             <div id="category-budget-section" class="manage-expense-card">
@@ -146,6 +345,72 @@
     <script src="newscript.js?v=4"></script>
     <script src="budget.js?v=4"></script>
     <script>
+    // Add edit and delete actions for category budgets
+    function renderCategoryBudgetTable(budgets, tableBodyId, category) {
+        const tbody = document.getElementById(tableBodyId);
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!budgets || budgets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No budgets found for this month</td></tr>';
+            return;
+        }
+        const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+        const showActions = role === 'admin';
+        budgets.forEach(budget => {
+            const tr = document.createElement('tr');
+            const actions = showActions ? `
+                <button onclick="editCategoryBudget(${budget.id}, '${budget.month}', '${budget.category}', '${budget.subcategory}', ${budget.amount})" style="background: #f1c40f; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer; margin-right:5px;"><i class='fas fa-edit'></i></button>
+                <button onclick="deleteCategoryBudget(${budget.id})" style="background: #e74c3c; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;"><i class='fas fa-trash'></i></button>
+            ` : '<span style="color:#666;">No actions</span>';
+            tr.innerHTML = `
+                <td>${budget.month}</td>
+                <td>${budget.subcategory}</td>
+                <td>$ ${parseFloat(budget.amount).toLocaleString()}</td>
+                <td>${actions}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Example usage: after fetching budgets, call this for each category
+    // renderCategoryBudgetTable(cogsBudgets, 'cogs-budget-table-body', 'COGS');
+    // renderCategoryBudgetTable(operatingBudgets, 'operating-budget-table-body', 'Operating expense');
+
+    function editCategoryBudget(id, month, category, subcategory, amount) {
+        const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+        if (role !== 'admin') return alert('Only Admin can edit category budgets.');
+        document.getElementById('budget_id').value = id;
+        document.getElementById('budget_month').value = month;
+        document.getElementById('budget_category').value = category;
+        // Optionally, trigger subcategory population if needed
+        setTimeout(function() {
+            document.getElementById('budget_subcategory').value = subcategory;
+        }, 100); // Wait for subcategory options to populate
+        document.getElementById('budget_amount').value = amount;
+        document.getElementById('form-title').innerText = 'Edit Budget';
+        document.getElementById('btn-cancel-edit').style.display = 'inline-block';
+    }
+
+    function deleteCategoryBudget(id) {
+        const role = (localStorage.getItem('coffee_user_role') || '').toLowerCase();
+        if (role !== 'admin') return alert('Only Admin can delete category budgets.');
+        if (!confirm('Are you sure you want to delete this category budget?')) return;
+        // Implement the API call to delete the budget, then reload
+        fetch(`http://127.0.0.1:8000/api/category_budgets/${id}`, {
+            method: 'DELETE'
+        }).then(response => {
+            if (response.ok) {
+                alert('Category budget deleted successfully!');
+                if (typeof loadBudgets === 'function') loadBudgets();
+            } else {
+                alert('Error deleting category budget');
+            }
+        }).catch(error => {
+            console.error('Error deleting category budget:', error);
+        });
+    }
+    </script>
+    <script>
         // Initialize the category budget page
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date();
@@ -168,45 +433,6 @@
             }
         });
     </script>
-    <script>
-        // If this page is opened inside another same-origin page, hide the parent's sidebar
-        // while this page is active, and restore it when this page unloads.
-        (function(){
-            try {
-                if (window.top && window.top !== window) {
-                    const parentDoc = window.top.document;
-                    const sidebar = parentDoc.querySelector('.sidebar');
-                    const dashboard = parentDoc.querySelector('#dashboard-section');
-                    if (sidebar) {
-                        // save current inline styles so we can restore them
-                        sidebar.dataset._prevDisplay = sidebar.style.display || '';
-                        sidebar.style.display = 'none';
-                    }
-                    if (dashboard) {
-                        dashboard.dataset._prevMargin = dashboard.style.marginLeft || '';
-                        dashboard.style.marginLeft = '0';
-                    }
-
-                    // Restore on unload/navigation away
-                    window.addEventListener('beforeunload', function() {
-                        try {
-                            if (sidebar) {
-                                sidebar.style.display = sidebar.dataset._prevDisplay || '';
-                                delete sidebar.dataset._prevDisplay;
-                            }
-                            if (dashboard) {
-                                dashboard.style.marginLeft = dashboard.dataset._prevMargin || '';
-                                delete dashboard.dataset._prevMargin;
-                            }
-                        } catch (e) {
-                            // ignore
-                        }
-                    });
-                }
-            } catch (e) {
-                // cross-origin or other access error; nothing to do
-            }
-        })();
-    </script>
+    <!-- Sidebar logic removed -->
 </body>
 </html>

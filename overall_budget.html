@@ -7,7 +7,7 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="side.css">
+
     <style>
         /* Page-specific override: hide the global sidebar when this page is opened directly */
         .sidebar { display: none !important; }
@@ -34,7 +34,169 @@
             background-color: #d4edda;
     border: 1px solid #28a745;
     color: #155724; 
-        }
+        }/* ===== Page Aesthetic Theme ===== */
+
+#dashboard-section {
+    background: linear-gradient(135deg, #f5f7fa, #fcede1);
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* ===== Header ===== */
+.dash-header {
+    background: white;
+    padding: 25px 30px;
+    border-radius: 16px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.dash-header h1 {
+    font-size: 22px;
+    color: #2c3e50;
+    flex-grow: 1;
+}
+
+/* ===== Buttons ===== */
+.dash-header button,
+.add-expense-btn,
+#btn-cancel-edit-overall {
+    transition: all 0.25s ease;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Hover lift effect */
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+/* Specific button colors */
+.dash-header button {
+    border-radius: 10px;
+}
+
+/* Save button glow */
+.add-expense-btn:hover {
+    background: #218838;
+}
+
+/* Cancel button hover */
+#btn-cancel-edit-overall:hover {
+    background: #777;
+}
+
+/* ===== Card Section ===== */
+.manage-expense-card {
+    background: white;
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.manage-expense-card:hover {
+    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+}
+
+/* ===== Inputs ===== */
+input[type="month"],
+input[type="number"],
+input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #dcdfe3;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+/* Focus highlight */
+input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+    background-color: #fafdff;
+}
+
+/* Green allowed months (keep your theme but soften) */
+#overall_budget_month,
+#overall_month_filter {
+    background-color: #f0fff4;
+    border: 1px solid #28a745;
+    color: #155724;
+}
+
+/* ===== Labels ===== */
+label {
+    letter-spacing: 0.5px;
+}
+
+/* ===== Table ===== */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+thead {
+    background: linear-gradient(100deg, #802E22, #883e32);
+    color: white;
+}
+
+th {
+    padding: 14px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 15px;
+}
+
+/* Row hover highlight */
+tbody tr {
+    transition: all 0.2s ease;
+}
+
+tbody tr:hover {
+    background-color: #f8fbff;
+    transform: scale(1.01);
+}
+
+/* ===== Action Buttons in Table ===== */
+td button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+/* ===== Titles ===== */
+h3 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+.add-expense-btn {
+    background: linear-gradient(135deg, #28a745, #34d058);
+}
+
+.add-expense-btn:hover {
+    background: linear-gradient(135deg, #218838, #2ecc71);
+}
+
 
   
     </style>
@@ -48,11 +210,11 @@
             <header class="dash-header">
                 <h1>Company Overall Budget Management (Monthly)</h1>
                 <button onclick="window.location.href='category_budget.html'; event.stopPropagation();" 
-                style="background: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+                style="background: #93BD57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
             Manage Category Budget
         </button>
 
-                 <button onclick="window.location.href='budget_section.html'" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
+                 <button onclick="window.location.href='budget_section.html'" style="background: #802E22; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
             <div id="category-budget-section" class="manage-expense-card">
