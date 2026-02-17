@@ -187,7 +187,9 @@
             <li><a href="{{ origin }}/"><i class="fa-solid fa-house"></i><span class="text">Dashboard</span></a></li>
             <li><a href="javascript:void(0)" class="active"><i class="fas fa-file-alt"></i><span class="text">Manage cash entry</span></a></li>
             <li><a href="{{ origin }}/#budget-page"><i class="fas fa-wallet"></i> <span class="text">Manage Budget</span> </a></li>
-            <li><a href="{{ origin }}/#report-page"><i class="fas fa-paper-plane"></i><span class="text" id="report-link-text">{% if role == 'admin' %}Intelligence Report{% else %}Submit Report{% endif %}</span></a></li>
+            {% if role == 'admin' %}
+            <li><a href="{{ origin }}/#report-page"><i class="fas fa-paper-plane"></i><span class="text" id="report-link-text">Intelligence Report</span></a></li>
+            {% endif %}
             <li><a href="javascript:void(0)" onclick="performLogout()"><i class="fas fa-sign-out-alt"></i><span class="text">Logout</span></a></li>
         </ul>
     </div>

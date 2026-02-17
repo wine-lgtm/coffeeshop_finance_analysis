@@ -844,3 +844,36 @@ def expense_by_subcategory(
     for (cat, sub), total in results.items():
         out.append({"category": cat, "subcategory": sub, "total": round(total, 2)})
     return out
+
+@router.get("/api/latest-labor-cost")
+def get_latest_labor_cost():
+    """Fetch the most recent Payroll entry from entries table."""
+    with cafe_engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT balance, date, staff_name, description
+            FROM entries
+            WHERE category = 'Payroll'
+              AND entry_type = 'expense'
+            ORDER BY date DESC, id DESC
+            LIMIT 1
+        """), {}).fetchone()
+    if row:
+        return {
+            "labor_cost": float(row[0]),
+            "date": str(row[1]),
+            "staff_name": row[2],
+            "description": row[3]
+        }
+    return {"labor_cost": None}
+
+@router.get("/api/sum-labor-cost")
+def get_sum_labor_cost(month: str = None):
+    """Fetch the sum of Payroll entries from entries table for admin for a specific month."""
+    query = "SELECT COALESCE(SUM(balance), 0) AS total FROM entries WHERE category = 'Payroll' AND entry_type = 'expense' AND staff_name = 'Admin'"
+    params = {}
+    if month:
+        query += " AND TO_CHAR(date, 'YYYY-MM') = :month"
+        params["month"] = month
+    with cafe_engine.connect() as conn:
+        row = conn.execute(text(query), params).fetchone()
+    return {"labor_cost_sum": float(row[0])}

@@ -1,18 +1,19 @@
 
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-        <meta http-equiv="Pragma" content="no-cache">
-        <meta http-equiv="Expires" content="0">
-        <title>Manage Budget (Sales)</title>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Manage Budget</title>
 
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link rel="stylesheet" href="style.css">
-        <link rel="stylesheet" href="side.css">
-  <!-- FINAL layout fix -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="side.css">
+
+    <!-- FINAL layout fix -->
     <style>
            body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -64,13 +65,7 @@
             padding: 12px 14px;
             text-align: left;
         }
-   #budget-page-standalone .card-grid {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            gap: 22px;
-            margin-top: 10px;
-        }
+
 
         #budget-page-standalone .summary-card {
             box-sizing: border-box;
@@ -218,8 +213,48 @@
            
             
         }
- 
+       
+  #budget-page-standalone .creamy-latte,
+        #budget-page-standalone .mocha-light {
+            background:
+                radial-gradient(circle at top left, rgba(255, 209, 163, 0.22), transparent 60%),
+                linear-gradient(135deg, rgba(31, 13, 7, 0.96), rgba(45, 21, 11, 0.98));
+            color: var(--coffee-text-main);
+        }
+    .cta-button {
+            margin-top: 12px;
+            width: 100%;
+            padding: 12px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            background: linear-gradient(90deg, #ffb347, #ffcc8f);
+            color: #2b130d;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow:
+                0 0 0 1px rgba(255, 179, 71, 0.4),
+                0 12px 28px rgba(0, 0, 0, 0.55);
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                filter 0.2s ease;
+        }
 
+        .cta-button:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+            box-shadow:
+                0 0 0 1px rgba(255, 231, 199, 0.8),
+                0 18px 46px rgba(0, 0, 0, 0.8);
+        }
+
+        .cta-button:active {
+            transform: translateY(0);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+        }
 /* Table row hover effect */
 #category-table-body tr {
     transition: background 0.3s, transform 0.2s; /* smooth transition */
@@ -273,6 +308,7 @@
             <h4>Total Actual Spent</h4>
             <div class="kpi-value">
                 <span id="total-actual-spent">$ 0</span>
+                <div id="labor-cost-info" style="font-size:1rem; color:#affbff; margin-top:6px; font-weight:500;"></div>
             </div>
         </div>
         <div class="summary-card kpi-card">
@@ -282,7 +318,7 @@
             </div>
         </div>
 </div>
-
+ 
 
     <!-- CATEGORY BREAKDOWN (middle table with switch) -->
     <div style="margin-top:30px;">
@@ -298,7 +334,7 @@
             <div id="category-header" style="margin-bottom:12px; font-weight:600; color:#333"> </div>
             <table style="width:100%; border-collapse:collapse;">
                 <thead>
-                    <tr style="background:#c96812; color:white;">
+                    <tr style="background:#583932; color:white;">
                         <th style="padding:10px; text-align:left;">Subcategory</th>
                         <th style="padding:10px; text-align:left;">Budgeted</th>
                         <th style="padding:10px; text-align:left;">Actual Spent</th>
@@ -313,7 +349,7 @@
     </div>
 
     <!-- KEY INSIGHTS -->
-    <div id="key-insights" style="margin-top:30px; background: linear-gradient(180deg,#fff7d6,#ffe8a8); border-radius:10px; padding:18px; border:3px solid #ffd24d; box-shadow:0 6px 18px rgba(0,0,0,0.04);">
+    <div id="key-insights" style="margin-top:30px; background: linear-gradient(180deg,#fff3c1,#ffe8a8); border-radius:10px; padding:18px; border:3px solid #ffd24d; box-shadow:0 6px 18px rgba(0,0,0,0.04);">
         <h3 style="color:#0b63c4; margin-top:0;">Key Insights</h3>
 
 
@@ -330,6 +366,7 @@
             <ul id="insights-recommendations" style="margin:0 0 0 18px; color:#222;"><li>Recommendations: (loading...)</li></ul>
         </div>
     </div>
+
     <!-- COMPANY BUDGET SECTION -->
     <div id="company-budget-section" class="manage-expense-card" style="display:none; margin-top:30px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -368,8 +405,6 @@
         </table>
     </div>
 
-    <!-- GENERAL BUDGET LIST -->
-   
 
 </div>
 
@@ -423,6 +458,8 @@
 
         // 2) Total Actual Spent (use financial-summary breakdown for month)
         let actualSpent = 0;
+        let laborCost = 0;
+        let latestLaborCost = null;
         try {
             const sumRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
             if (sumRes.ok) {
@@ -430,11 +467,40 @@
                 const breakdown = data.breakdown || {};
                 const cogs = parseFloat(breakdown.cogs || 0);
                 const operating = parseFloat(breakdown.operating || 0);
-                const payroll = parseFloat(breakdown.payroll || 0);
-                actualSpent = cogs + operating + payroll;
+                laborCost = parseFloat(breakdown.payroll || 0);
+                actualSpent = cogs + operating;
             }
         } catch (e) { console.error('Failed to load financial summary:', e); }
+
+        // Fetch sum of labor cost entries from admin for the selected month onlyz
+        let laborCostSum = null;
+        try {
+            const sumLaborRes = await fetch(`${API_BASE}/api/sum-labor-cost?month=${month}`);
+            if (sumLaborRes.ok) {
+                const sumLaborData = await sumLaborRes.json();
+                if (sumLaborData.labor_cost_sum !== null && !isNaN(sumLaborData.labor_cost_sum)) {
+                    laborCostSum = parseFloat(sumLaborData.labor_cost_sum);
+                }
+            }
+        } catch (e) { console.error('Failed to load sum labor cost:', e); }
+
+        // Prefer laborCost (payroll sum for month) if available, else admin sum for this month
+        let showValue = null;
+        if (laborCost !== 0) {
+            showValue = laborCost;
+        } else if (laborCostSum !== null && laborCostSum !== 0) {
+            showValue = laborCostSum;
+        }
+
         elActual.innerText = `$ ${actualSpent.toLocaleString()}`;
+        const laborInfo = document.getElementById('labor-cost-info');
+        if (laborInfo) {
+            if (showValue !== null) {
+                laborInfo.innerText = `Labor Cost: $ ${showValue.toLocaleString()}`;
+            } else {
+                laborInfo.innerText = '';
+            }
+        }
 
         // 3) Variance
         const variance = totalBudgeted - actualSpent;
@@ -554,7 +620,7 @@
                     (entries || []).forEach(e => {
                         const subcat = (e.subcategory != null && String(e.subcategory).trim() !== '') ? String(e.subcategory).trim() : null;
                         if (!subcat) return;
-                        const catRaw = (e.category != null) ? String(e.category).trim() : '';
+                        const catRaw = (e.category != null) ? String(e.category).trim().toLowerCase() : '';
                         const key = `${catRaw.toLowerCase()}||${subcat}`;
                         budgetMap[key] = (budgetMap[key] || 0) + Number(e.budgeted || 0);
                     });
@@ -587,7 +653,7 @@
 
                 sumEl.innerHTML = `Summary of Budget Status:<br>` +
                     `- <span style="color:green; font-weight:700;">Under Budget:</span> ${ub.count} subcategories — Total savings: $ ${Math.round(ub.total).toLocaleString()}.<br>` +
-                    `- <span style="color:red; font-weight:700;">Over Budget:</span> ${ob.count} subcategories — Total overrun: $ ${Math.round(explicitOverrunTotal).toLocaleString()}.`;
+                    `- <span style="color:#c9302c; font-weight:700;">Over Budget:</span> ${ob.count} subcategories — Total overrun: $ ${Math.round(explicitOverrunTotal).toLocaleString()}.`;
 
                 // Also show no-budget creation count separately (unique subcategory counts)
                 const noBudgetEl = document.getElementById('insights-no-budget');
@@ -625,9 +691,9 @@
                         }
                     });
 
-                    noBudgetEl.innerHTML = `No Budget Creation: ${noBudgetGlobal.size} subcategories total — ` +
-                        `COGS: ${noBudgetByCat['COGS'].subs.size} subcategories ,` +
-                        `Operating expense: ${noBudgetByCat['Operating expense'].subs.size} subcategories .`;
+                    noBudgetEl.innerHTML = `Used but not budgeted: ${noBudgetGlobal.size} subcategories total — ` +
+                        `COGS:   ${noBudgetByCat['COGS'].subs.size} subcategories ,   ` +
+                        `Operating expense:   ${noBudgetByCat['Operating expense'].subs.size} subcategories .`;
                 }
             }
 
@@ -781,12 +847,12 @@
         <span class="currency">$</span>
         <span class="value">${variance.toLocaleString()}</span>
     </td>
-                    <td style="padding:10px; text-align:center; font-size:15px;">
+                   <td style="padding:10px; text-align:center; font-size:15px;">
     ${status === 'No Budget Creation' 
         ? '<span style="display: inline-block; background-color: #ffe2b8; color: black;padding: 4px 12px;         border-radius: 12px;      font-weight: bold;font-size: 15px;text-align: center;">No Budget Creation</span>'
         : status === 'Under Budget'
             ? '<span>Under Budget</span>'
-            : '<span style="color:red; font-weight:bold;">Over Budget</span>'
+            : '<span style="color:#c9302c; font-weight:bold;">Over Budget</span>'
     }
 </td>
                     <td style="padding:10px; text-align:center">${alertText}</td>
@@ -827,12 +893,12 @@
         <span class="currency">$</span>
         <span class="value">${variance.toLocaleString()}</span>
     </td>
-                     <td style="padding:10px; text-align:center; font-size:15px;">
+                <td style="padding:10px; text-align:center; font-size:14px;">
     ${status === 'No Budget Creation' 
-        ? '<span style="display: inline-block; background-color: #ffe2b8; color: black;padding: 4px 12px;         border-radius: 12px;      font-weight: bold;font-size: 15px;text-align: center;">No Budget Creation</span>'
+        ? '<span style="display: inline-block; background-color: #ffe2b8; color: black;padding: 4px 12px;         border-radius: 12px;    font-size: 14px;text-align: center;">No Budget Creation</span>'
         : status === 'Under Budget'
             ? '<span>Under Budget</span>'
-            : '<span style="color:red; font-weight:bold;">Over Budget</span>'
+            : '<span style="color:#c9302c; font-weight:bold;">Over Budget</span>'
     }
 </td>
                     <td style="padding:10px; text-align:center">${alertText}</td>
@@ -863,3 +929,4 @@
 
 </body>
 </html>
+
