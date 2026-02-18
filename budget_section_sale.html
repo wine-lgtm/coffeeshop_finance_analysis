@@ -1,5 +1,5 @@
 
-    <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -213,7 +213,7 @@
            
             
         }
-       
+   
   #budget-page-standalone .creamy-latte,
         #budget-page-standalone .mocha-light {
             background:
@@ -305,7 +305,7 @@
             </div>
         </div>
         <div class="summary-card kpi-card">
-            <h4>Total Actual Spent</h4>
+            <h4>Total Actual Spent(COGS + OPEX)</h4>
             <div class="kpi-value">
                 <span id="total-actual-spent">$ 0</span>
                 <div id="labor-cost-info" style="font-size:1rem; color:#affbff; margin-top:6px; font-weight:500;"></div>
@@ -318,7 +318,7 @@
             </div>
         </div>
 </div>
- 
+
 
     <!-- CATEGORY BREAKDOWN (middle table with switch) -->
     <div style="margin-top:30px;">
@@ -502,8 +502,18 @@
             }
         }
 
-        // 3) Variance
+       /* // 3) Variance
         const variance = totalBudgeted - actualSpent;
+        const percent = totalBudgeted ? (variance / totalBudgeted) * 100 : 0;
+        const absVar = Math.abs(variance);
+        const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
+        const sign = variance >= 0 ? '' : '-';
+        elVar.innerHTML = `${sign}$ ${absVar.toLocaleString()} <div style="font-size:0.9rem; color:#666; margin-top:6px;">(${Math.abs(percent).toFixed(1)}% ${status})</div>`;
+    }*/
+        // 3) Variance: include labor cost in actuals (COGS + OPEX + Labor)
+        // determine labor total (prefer the payroll breakdown, fall back to admin sum)
+        const laborTotal = (showValue !== null && !isNaN(showValue)) ? parseFloat(showValue) : (laborCost || 0);
+        const variance = totalBudgeted - (actualSpent + laborTotal);
         const percent = totalBudgeted ? (variance / totalBudgeted) * 100 : 0;
         const absVar = Math.abs(variance);
         const status = variance >= 0 ? 'Under Budget' : 'Over Budget';
@@ -929,4 +939,3 @@
 
 </body>
 </html>
-
