@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payroll Budget - Coffee Cashflow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .sidebar { display: none !important; }
+        #dashboard-section { margin-left: 0 !important; padding: 40px; }
+        /* reuse a compact subset of overall styles */
+
+        
+/* ===== Header ===== */
+.dash-header {
+    background: white;
+    padding: 22px 28px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.dash-header h1 {
+    font-size: 22px;
+    color: #2c3e50;
+    flex-grow: 1;
+}
+h3 {
+    margin-top: 10px;
+    color: #2c3e50;
+}
+
+h4 {
+    color: #34495e;
+}
+/* Save button */
+.add-expense-btn {
+    background: linear-gradient(135deg, #28a745, #34d058);
+    border: none;
+    color: white;
+}
+
+.add-expense-btn:hover {
+    background: linear-gradient(135deg, #218838, #2ecc71);
+}
+
+/* ===== Buttons ===== */
+button {
+    border-radius: 10px;
+    transition: all 0.25s ease;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Lift animation */
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(113, 112, 112, 0.12);
+}
+        .manage-expense-card { background: white; padding: 20px; border-radius: 12px; }
+        input[type="month"], input[type="number"], input[type="text"] { width:100%; padding:8px; border-radius:8px; }
+        table { width:100%; border-collapse: collapse; margin-top: 12px; }
+        thead {
+    background: linear-gradient(100deg, #802E22, #883e32);
+    color: white;
+}
+        th {
+    padding: 14px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 15px;
+}
+    </style>
+</head>
+<body>
+  <div id="dashboard-section">
+        
+        <div id="budget-page" class="page-section active-section">
+            <header class="dash-header">
+                <h1>Payroll Budget Management</h1>
+                <button onclick="window.location.href='overall_budget.html'; event.stopPropagation();" 
+                style="background: #bdbb57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Overall Budget
+        </button>
+        <button onclick="window.location.href='category_budget.html'; event.stopPropagation();" 
+                style="background: #87bd57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Category Budget
+        </button>
+                <button onclick="window.location.href='budget_section.html'" style="background: #802E22; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
+            </header>
+
+            <div class="manage-expense-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 id="payroll-form-title">Add New Payroll Budget</h3>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="month" id="payroll_month_filter" onchange="loadPayrollBudgets()" style="padding:8px; border-radius:6px;">
+                        <button onclick="loadPayrollBudgets()" style="background:#2ea44f; color:white; border:none; padding:8px 10px; border-radius:6px;">Filter</button>
+                    </div>
+                </div>
+                <!-- KPIs -->
+                <div id="payroll-kpis" style="display:flex; gap:12px; margin-bottom:12px;">
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Overall Budget</div>
+                        <div id="kpi-overall" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">COGS</div>
+                        <div id="kpi-cogs" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Operating</div>
+                        <div id="kpi-operating" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Payroll</div>
+                        <div id="kpi-payroll" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                </div>
+
+                <!-- Overrun panel: show when total of 3 main categories > overall budget -->
+                <div id="category-overrun-panel" style="display:none; margin-bottom:16px; padding:16px; background:#fff3cd; border:1px solid #ffc107; border-radius:12px;">
+                    <div style="font-weight:600; color:#856404; margin-bottom:8px;">
+                        <i class="fas fa-exclamation-triangle"></i> Category budgets exceed the overall budget for this month.
+                    </div>
+                    <div id="category-overrun-detail" style="font-size:13px; color:#856404; margin-bottom:12px;"></div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button id="btn-finalize-budgets" type="button" style="background:linear-gradient(135deg,#28a745,#34d058); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600;">
+                            <i class="fas fa-check-double"></i> Finalize (scale to fit)
+                        </button>
+                        <button id="btn-cancel-finalize" type="button" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Cancel</button>
+                    </div>
+                </div>
+                <div id="category-finalize-result" style="display:none; margin-bottom:16px; padding:12px; background:#d4edda; border:1px solid #28a745; border-radius:10px; font-size:13px;"></div>
+
+                <div>
+                    <input type="hidden" id="payroll_budget_id">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1.5fr auto; gap:12px; align-items:end;">
+                        <div>
+                            <label>MONTH</label>
+                            <input type="month" id="payroll_budget_month" title="Only current month through next 3 months can be selected">
+                        </div>
+                        <div>
+                            <label>AMOUNT</label>
+                            <input type="number" id="payroll_budget_amount" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label>DESCRIPTION</label>
+                            <input type="text" id="payroll_budget_description" placeholder="e.g. Salaries and wages">
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="savePayrollBudget()" class="add-expense-btn" style="height:42px;">Save</button>
+                            <button id="btn-cancel-edit-payroll" onclick="clearPayrollForm()" style="display:none; background:#999; color:white; border:none; padding:0 12px; border-radius:10px;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top:16px;">Monthly Payroll Budget List</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Amount</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payroll-budget-table-body"></tbody>
+                </table>
+                
+                <!-- Payroll Insights moved to its own card below -->
+            </div>
+        </div>
+        <!-- Separate card for Payroll Insights -->
+<div class="manage-expense-card" style="margin-top:20px; padding:12px; border-radius:8px; background:#f9f9f9;">
+    <h3 style="margin-top:0;">Payroll Insights</h3>
+
+    <!-- Top-level horizontal: Workers & Salaries | Last 3 months payroll -->
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+
+        <!-- Left block -->
+        <div style="flex:1 1 300px; background:white; padding:12px; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Workers & Salaries</strong>
+                <button id="toggle-worker-list" style="background:#eee; border:none; padding:6px 8px; border-radius:6px;">Hide</button>
+            </div>
+            <div id="worker-summary">
+                <div><strong>Number of workers:</strong> <span id="payroll-worker-count">0</span></div>
+                <div><strong>Sum base salaries:</strong> <span id="payroll-worker-base-sum">$0.00</span></div>
+                <div style="margin-top:8px;"><strong>Salary list:</strong></div>
+                <div id="payroll-worker-list" style="margin-top:6px; max-height:160px; overflow:auto; border-top:1px solid #f1f3f5; padding-top:8px;"></div>
+            </div>
+        </div>
+
+        <!-- Right block -->
+        <div style="flex:600px; background:white; padding:12px; border-radius:8px; display:flex; gap:12px; flex-wrap:wrap;">
+            
+            <!-- Nested left inside right block -->
+         
+      
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Last 3 months payroll</strong>
+                <button id="toggle-payroll-three-month" style="background:#eee; border:none; padding:6px 8px; border-radius:6px;">Hide</button>
+            </div>
+
+<div id="payroll-three-month-block" style="width:100%; flex-basis:100%;">
+<table style="width:100%; margin-bottom:12px; table-layout:fixed;">
+    <thead style="background:#7a91b3; color:white;">
+        <tr>
+            <th>Month</th>
+            <th style="text-align:right">Net Pay</th>
+        </tr>
+    </thead>
+    <tbody id="payroll-three-month-table-body"></tbody>
+</table>
+</div>
+
+<!-- Summary + Buttons Row -->
+<div style="display:flex; justify-content:space-between; align-items:flex-start;">
+
+   
+
+   <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px;">
+
+    <!-- Payroll summary (aligned under Net Pay column) -->
+    <div style="display:flex; gap:8px; margin-top:8px; justify-content:flex-end; align-items:center;">
+    <div style="margin-bottom:6px;"><strong>Average:</strong> <span id="payroll-three-month-avg">$0.00</span></div>
+    <div><strong>Highest:</strong> <span id="payroll-three-month-highest">-</span></div>
+    
+    <!-- Separator -->
+    <div style="width:70px; height:24px;"></div>
+    
+    <button id="use-payroll-average-btn" style="background:#3b82f6; color:white; border:none; padding:6px 8px; border-radius:6px;">Use Average</button>
+    <button id="use-payroll-highest-btn" style="background:#f97316; color:white; border:none; padding:6px 8px; border-radius:6px;">Use Highest</button>
+    <button id="use-payroll-avg-buffer-btn" style="background:#10b981; color:white; border:none; padding:6px 8px; border-radius:6px;">+10% Buffer</button>
+</div>
+ 
+    </div>
+
+    <script src="newscript.js?v=1"></script>
+    <script src="payroll_budget.js?v=1"></script>
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        async function updateKPIsForPayroll() {
+            const filter = document.getElementById('payroll_month_filter');
+            if (!filter || !filter.value) return;
+            const month = filter.value;
+            try {
+                const res = await fetch(`${API_BASE}/api/kpis?month=${month}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                document.getElementById('kpi-overall').innerText = data.overall && data.overall.budgeted ? `$ ${Number(data.overall.budgeted).toLocaleString()}` : '-';
+                document.getElementById('kpi-cogs').innerText = data.cogs && data.cogs.budgeted ? `$ ${Number(data.cogs.budgeted).toLocaleString()} (${data.cogs.percent_of_overall ?? '-' }%)` : '-';
+                document.getElementById('kpi-operating').innerText = data.operating && data.operating.budgeted ? `$ ${Number(data.operating.budgeted).toLocaleString()} (${data.operating.percent_of_overall ?? '-' }%)` : '-';
+                document.getElementById('kpi-payroll').innerText = data.payroll && data.payroll.budgeted ? `$ ${Number(data.payroll.budgeted).toLocaleString()} (${data.payroll.percent_of_overall ?? '-' }%)` : '-';
+                if (data.payroll && data.payroll.base) {
+                    const el = document.getElementById('payroll-worker-base-sum');
+                    if (el) el.innerText = `$ ${Number(data.payroll.base).toLocaleString()}`;
+                }
+                // Show/hide overrun panel using backend budget-summary (same logic as category page)
+                const summaryRes = await fetch(`${API_BASE}/api/budget-summary?month=${encodeURIComponent(month)}`);
+                if (summaryRes.ok) {
+                    const summary = await summaryRes.json();
+                    if (typeof showOrHideFinalizePanelPayroll === 'function') showOrHideFinalizePanelPayroll(summary.overall, summary.main_sum, summary.overrun);
+                }
+            } catch (err) { console.error('Error fetching payroll KPIs', err); }
+        }
+        function payrollBudgetMonth() {
+            const f = document.getElementById('payroll_month_filter');
+            return f ? f.value : '';
+        }
+        function showOrHideFinalizePanelPayroll(overall, totalMain, overrun) {
+            const panel = document.getElementById('category-overrun-panel');
+            const resultEl = document.getElementById('category-finalize-result');
+            if (!panel) return;
+            const show = overrun === true || (overall != null && totalMain > overall);
+            if (show) {
+                const detail = document.getElementById('category-overrun-detail');
+                const excess = overall != null && totalMain > overall ? totalMain - overall : (totalMain - (overall || 0));
+                if (detail) detail.innerHTML = `Overall: $ ${Number(overall).toLocaleString()} &nbsp;|&nbsp; COGS + Operating + Payroll = $ ${Number(totalMain).toLocaleString()} (exceeds by $ ${Number(excess).toLocaleString()}). Click <strong>Finalize</strong> to scale all category budgets to fit.`;
+                panel.style.display = 'block';
+                if (resultEl) resultEl.style.display = 'none';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        // Helper used from JS (e.g. payroll_budget.js) when a save fails
+        // with an \"over budget\" message so the Finalize panel is forced visible.
+        function showCategoryOverrunPanel(detailMessage) {
+            const panel = document.getElementById('category-overrun-panel');
+            const resultEl = document.getElementById('category-finalize-result');
+            const detailEl = document.getElementById('category-overrun-detail');
+            if (!panel) return;
+            if (detailEl && detailMessage) {
+                detailEl.textContent = detailMessage;
+            }
+            panel.style.display = 'block';
+            if (resultEl) resultEl.style.display = 'none';
+        }
+        async function onFinalizeBudgetsPayroll() {
+            const month = payrollBudgetMonth();
+            if (!month) return;
+            const btn = document.getElementById('btn-finalize-budgets');
+            const resultEl = document.getElementById('category-finalize-result');
+            const panel = document.getElementById('category-overrun-panel');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finalizing...'; }
+            try {
+                const res = await fetch(`${API_BASE}/api/finalize-budgets?month=${encodeURIComponent(month)}`, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    alert(data.detail || 'Failed to finalize budgets.');
+                    return;
+                }
+                const factor = data.factor != null ? (Number(data.factor) * 100).toFixed(1) : '-';
+                let msg = 'Scaling factor applied: ' + factor + '%. Budgets have been updated to fit the overall budget.';
+                if (data.updates && data.updates.length) {
+                    const mainUpdates = data.updates.filter(function(u){ return u.category; });
+                    if (mainUpdates.length) msg += ' Main categories and payroll updated.';
+                }
+                if (data.payroll && data.payroll.new != null) msg += ' Payroll: $ ' + Number(data.payroll.new).toLocaleString();
+                if (resultEl) { resultEl.innerHTML = msg; resultEl.style.display = 'block'; }
+                if (panel) panel.style.display = 'none';
+                updateKPIsForPayroll();
+                if (typeof loadPayrollBudgets === 'function') loadPayrollBudgets();
+            } catch (err) {
+                console.error('Finalize error', err);
+                alert('Error finalizing budgets. Please try again.');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> Finalize (scale to fit)'; }
+            }
+        }
+        function onCancelFinalizePayroll() {
+            const panel = document.getElementById('category-overrun-panel');
+            if (panel) panel.style.display = 'none';
+        }
+        document.addEventListener('DOMContentLoaded', function(){
+            updateKPIsForPayroll();
+            const f = document.getElementById('payroll_month_filter');
+            if (f) {
+                f.addEventListener('change', function(){
+                    updateKPIsForPayroll();
+                    var month = f.value;
+                    if (!month) return;
+                    fetch(API_BASE + '/api/budget-summary?month=' + encodeURIComponent(month))
+                        .then(function(r){ return r.ok ? r.json() : null; })
+                        .then(function(summary){
+                            if (summary) showOrHideFinalizePanelPayroll(summary.overall, summary.main_sum, summary.overrun);
+                        })
+                        .catch(function(){});
+                });
+            }
+            setInterval(updateKPIsForPayroll, 30000);
+            var btnFinalize = document.getElementById('btn-finalize-budgets');
+            var btnCancel = document.getElementById('btn-cancel-finalize');
+            if (btnFinalize) btnFinalize.addEventListener('click', onFinalizeBudgetsPayroll);
+            if (btnCancel) btnCancel.addEventListener('click', onCancelFinalizePayroll);
+
+            // Wire hide/show toggle for last 3 months payroll table
+            try {
+                const toggleBtn = document.getElementById('toggle-payroll-three-month');
+                const block = document.getElementById('payroll-three-month-block');
+                if (toggleBtn && block) {
+                    toggleBtn.addEventListener('click', function(){
+                        if (block.style.display === 'none') { block.style.display = ''; toggleBtn.innerText = 'Hide'; }
+                        else { block.style.display = 'none'; toggleBtn.innerText = 'Show'; }
+                    });
+                }
+            } catch (e) { console.error('Failed to wire payroll 3-month toggle', e); }
+        });
+    </script>
+</body>
+</html>

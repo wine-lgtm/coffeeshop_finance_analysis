@@ -84,7 +84,19 @@
             font-feature-settings: "tnum";
             white-space: nowrap;
             font-size: 16px;
-        }
+        }.switch-btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #eee;
+    color: #000;
+    border: none;
+    cursor: pointer;
+}
+
+.switch-btn.active {
+    background: #ffb347;
+    color: #fff;
+}
 
 .currency {
     display: inline-block;
@@ -384,7 +396,7 @@
         <div class="summary-card mocha-light">
             <div>
                 <h4>Category Budgets</h4>
-                <p>Handle budgets for specific categories like marketing, operations, etc.</p>
+                <p>Handle budgets for specific categories like COGS, OPEX, Payroll.</p>
             </div>
             <button class="cta-button" onclick="location.href='category_budget.html'">
                 Manage Budget
@@ -399,6 +411,7 @@
             <div style="display:flex; gap:8px;">
                 <button id="switch-cogs" style="padding:8px 12px; border-radius:8px; background:#ffb347; color:white; border:none; cursor:pointer;">COGS</button>
                 <button id="switch-opex" style="padding:8px 12px; border-radius:8px; background:#eee; border:none; cursor:pointer; color:#000">Operating Expenses</button>
+                <button id="switch-employee" style="padding:8px 12px; border-radius:8px; background:#eee; border:none; cursor:pointer; color:#000">Employees</button>
             </div>
         </div>
 
@@ -766,6 +779,53 @@
                         `COGS:   ${noBudgetByCat['COGS'].subs.size} subcategories ,   ` +
                         `Operating expense:   ${noBudgetByCat['Operating expense'].subs.size} subcategories .`;
                 }
+
+                // Employee payroll status: show budget vs actual and status
+                try {
+                    let payrollBudget = 0;
+                    try {
+                        const pbRes = await fetch(`${API_BASE}/api/payroll_budgets?month=${month}`);
+                        if (pbRes.ok) {
+                            const pbList = await pbRes.json();
+                            payrollBudget = (pbList || []).reduce((s, it) => s + Number(it.amount || 0), 0);
+                        }
+                    } catch (e) { console.error('Failed to fetch payroll_budgets for insights:', e); }
+
+                    let payrollActual = 0;
+                    try {
+                        const fsRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
+                        if (fsRes.ok) {
+                            const fsData = await fsRes.json();
+                            const br = fsData.breakdown || {};
+                            if (br.payroll != null && !isNaN(Number(br.payroll))) payrollActual = Number(br.payroll || 0);
+                        }
+                    } catch (e) { console.error('Failed to fetch financial-summary for payroll in insights:', e); }
+
+                    if ((!payrollActual || payrollActual === 0) && true) {
+                        try {
+                            const kiRes2 = await fetch(`${API_BASE}/api/key-insights?start_date=${start}&end_date=${end}&month=${month}&source=reporting`);
+                            if (kiRes2.ok) {
+                                const ki2 = await kiRes2.json();
+                                (ki2.entries || []).forEach(e => {
+                                    if (!e) return;
+                                    const cat = (e.category || '').toString().trim().toLowerCase();
+                                    if (cat !== 'payroll') return;
+                                    payrollActual += Number(e.actual || 0);
+                                });
+                            }
+                        } catch (e) { console.error('Failed to fetch payroll fallback from key-insights for insights:', e); }
+                    }
+
+                    const pBudget = Math.round(payrollBudget * 100) / 100;
+                    const pActual = Math.round(payrollActual * 100) / 100;
+                    let pStatus = '';
+                    if (!pBudget || pBudget === 0) pStatus = 'No Budget Creation';
+                    else pStatus = (pActual > pBudget) ? 'Over Budget' : 'Under Budget';
+
+                    if (sumEl) {
+                        sumEl.innerHTML += `<br><strong>Employee payroll:</strong> Budget $ ${pBudget.toLocaleString()} — Actual $ ${pActual.toLocaleString()} — <span style=\"color:${pStatus === 'Over Budget' ? '#c9302c' : '#2ea44f'}\">${pStatus}</span>`;
+                    }
+                } catch (e) { console.error('Failed to compute employee payroll status for key insights:', e); }
             }
 
             // Alerts
@@ -825,6 +885,7 @@
         // ---- Category breakdown table and switches ----
         const btnCogs = document.getElementById('switch-cogs');
         const btnOpex = document.getElementById('switch-opex');
+        const btnEmployee = document.getElementById('switch-employee');
         const tbody = document.getElementById('category-table-body');
         const headerEl = document.getElementById('category-header');
         if (!btnCogs || !btnOpex || !tbody || !headerEl) return;
@@ -978,7 +1039,74 @@
             });
         }
 
-        // set up switch buttons
+        async function loadEmployeeBreakdown() {
+            const { month, start, end } = _getCurrentMonthRange();
+            headerEl.innerText = `Payroll summary (Employees) for ${month}`;
+
+            // 1) Sum payroll budgets for the month (from payroll_budgets)
+            let budgetSum = 0;
+            try {
+                const res = await fetch(`${API_BASE}/api/payroll_budgets?month=${month}`);
+                if (res.ok) {
+                    const list = await res.json();
+                    budgetSum = (list || []).reduce((s, it) => s + Number(it.amount || 0), 0);
+                }
+            } catch (e) { console.error('Failed to fetch payroll budgets:', e); }
+
+            // 2) Sum actual payroll spending for the month.
+            // Prefer financial-summary breakdown.payroll, fallback to key-insights payroll entries.
+            let actualPayroll = 0;
+            try {
+                const sumRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
+                if (sumRes.ok) {
+                    const data = await sumRes.json();
+                    const breakdown = data.breakdown || {};
+                    if (breakdown.payroll != null && !isNaN(Number(breakdown.payroll))) {
+                        actualPayroll = Number(breakdown.payroll || 0);
+                    }
+                }
+            } catch (e) { console.error('Failed to fetch financial summary for payroll:', e); }
+
+            if (!actualPayroll || actualPayroll === 0) {
+                // fallback: sum payroll entries from key-insights (reporting source)
+                try {
+                    const kiRes = await fetch(`${API_BASE}/api/key-insights?start_date=${start}&end_date=${end}&month=${month}&source=reporting`);
+                    if (kiRes.ok) {
+                        const ki = await kiRes.json();
+                        (ki.entries || []).forEach(e => {
+                            if (!e) return;
+                            const cat = (e.category || '').toString().trim().toLowerCase();
+                            if (cat !== 'payroll') return;
+                            actualPayroll += Number(e.actual || 0);
+                        });
+                    }
+                } catch (e) { console.error('Failed to fetch key-insights fallback for payroll:', e); }
+            }
+
+            // 3) Compute variance and status
+            const budget = Math.round(budgetSum * 100) / 100;
+            const actual = Math.round(actualPayroll * 100) / 100;
+            const variance = Math.round((budget - actual) * 100) / 100;
+            let status = '';
+            if (!budget || budget === 0) status = 'No Budget Creation';
+            else status = (variance < 0) ? 'Over Budget' : 'Under Budget';
+            const alertText = (status === 'Over Budget') ? '<span style="color:#c9302c; font-weight:700;">Over Budget Alert</span>' : '<span style="color:#2ea44f; font-weight:700;">OK</span>';
+
+            // Render single summary row
+            tbody.innerHTML = '';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:10px">Payroll (Employees)</td>
+                <td class="amount-cell"><span class="currency">$</span><span class="value">${budget.toLocaleString()}</span></td>
+                <td class="amount-cell"><span class="currency">$</span><span class="value">${actual.toLocaleString()}</span></td>
+                <td class="amount-cell"><span class="currency">$</span><span class="value">${variance.toLocaleString()}</span></td>
+                <td style="padding:10px; text-align:center">${status === 'No Budget Creation' ? '<span style="display:inline-block;background-color:#ffe2b8;color:black;padding:4px 12px;border-radius:12px;font-weight:bold;font-size:14px;text-align:center;">No Budget Creation</span>' : (status === 'Under Budget' ? '<span>Under Budget</span>' : '<span style="color:#c9302c; font-weight:bold;">Over Budget</span>')}</td>
+                <td style="padding:10px; text-align:center">${alertText}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        /* set up switch buttons
         btnCogs.addEventListener('click', function() {
             btnCogs.style.background = '#ffb347'; btnCogs.style.color = '#fff';
             btnOpex.style.background = '#eee'; btnOpex.style.color = '#000';
@@ -992,8 +1120,62 @@
             loadCategoryBreakdown('Operating expense');
         });
 
+        if (btnEmployee) {
+            btnEmployee.addEventListener('click', function() {
+                btnEmployee.style.background = '#ffb347'; btnEmployee.style.color = '#fff';
+                btnCogs.style.background = '#eee'; btnCogs.style.color = '#000';
+
+                currentCategory = 'Employees';
+                loadEmployeeBreakdown('Employees');
+            });
+        }*/
+       function resetButtons() {
+    btnCogs.style.background = '#eee';
+    btnCogs.style.color = '#000';
+
+    btnOpex.style.background = '#eee';
+    btnOpex.style.color = '#000';
+
+    if (btnEmployee) {
+        btnEmployee.style.background = '#eee';
+        btnEmployee.style.color = '#000';
+    }
+}btnCogs.addEventListener('click', function() {
+    resetButtons();
+
+    btnCogs.style.background = '#ffb347';
+    btnCogs.style.color = '#fff';
+
+    currentCategory = 'COGS';
+    loadCategoryBreakdown('COGS');
+});btnOpex.addEventListener('click', function() {
+    resetButtons();
+
+    btnOpex.style.background = '#ffb347';
+    btnOpex.style.color = '#fff';
+
+    currentCategory = 'Operating expense';
+    loadCategoryBreakdown('Operating expense');
+});if (btnEmployee) {
+    btnEmployee.addEventListener('click', function() {
+        resetButtons();
+
+        btnEmployee.style.background = '#ffb347';
+        btnEmployee.style.color = '#fff';
+
+        currentCategory = 'Employees';
+        loadEmployeeBreakdown('Employees');
+    });
+}function setActive(button) {
+    document.querySelectorAll('.switch-btn')
+        .forEach(btn => btn.classList.remove('active'));
+
+    button.classList.add('active');
+}
+
         // initial load
-        loadCategoryBreakdown('COGS');
+        if (currentCategory === 'Employees' && btnEmployee) loadEmployeeBreakdown();
+        else loadCategoryBreakdown('COGS');
     });
 </script>
 

@@ -99,6 +99,24 @@ function renderOverallBudgetTable(budgets) {
     });
 }
 
+// Fetch starting balance for a given YYYY-MM month by calling financial-summary
+async function fetchStartingBalanceForMonth(month) {
+    if (!month) return null;
+    try {
+        const [y, m] = month.split('-').map(v => parseInt(v, 10));
+        const lastDay = new Date(y, m, 0).getDate();
+        const start = `${month}-01`;
+        const end = `${month}-${String(lastDay).padStart(2, '0')}`;
+        const res = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return (data && data.summary && typeof data.summary.starting_balance !== 'undefined') ? Number(data.summary.starting_balance) : null;
+    } catch (err) {
+        console.warn('Could not fetch starting balance for', month, err);
+        return null;
+    }
+}
+
 async function saveOverallBudget() {
     const id = document.getElementById('overall_budget_id').value;
     const month = document.getElementById('overall_budget_month').value;
@@ -123,6 +141,27 @@ async function saveOverallBudget() {
     const method = id ? 'PUT' : 'POST';
 
     try {
+        // Validate: Budget must be <= Starting Balance for the month
+        try {
+            const { start, end } = (function(m) {
+                const [y, mm] = m.split('-').map(v => parseInt(v,10));
+                const last = new Date(y, mm, 0).getDate();
+                return { start: `${m}-01`, end: `${m}-${String(last).padStart(2,'0')}` };
+            })(month);
+            const sbRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
+            if (sbRes.ok) {
+                const sbData = await sbRes.json();
+                const startingBalance = sbData && sbData.summary ? Number(sbData.summary.starting_balance || 0) : null;
+                if (startingBalance !== null && data.amount > startingBalance) {
+                    alert('Budget cannot exceed available cash');
+                    return;
+                }
+            }
+        } catch (err) {
+            // if starting balance fetch fails, allow save to proceed but warn
+            console.warn('Could not validate starting balance:', err);
+        }
+
         const response = await fetch(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
@@ -179,6 +218,12 @@ function editOverallBudget(id, month, amount, description) {
     }
     document.getElementById('form-title').innerText = 'Edit Monthly Overall Budget';
     document.getElementById('btn-cancel-edit-overall').style.display = 'inline-block';
+    // Fetch and show starting balance for the editing month
+    (async function() {
+        const sb = await fetchStartingBalanceForMonth(month);
+        const el = document.getElementById('overall_starting_balance_form');
+        if (el) el.innerText = sb !== null ? `$ ${sb.toLocaleString()}` : '-';
+    })();
 }
 
 function clearOverallForm() {
@@ -193,6 +238,8 @@ function clearOverallForm() {
     }
     document.getElementById('form-title').innerText = 'Add New Monthly Overall Budget';
     document.getElementById('btn-cancel-edit-overall').style.display = 'none';
+    const el = document.getElementById('overall_starting_balance_form');
+    if (el) el.innerText = '-';
 }
 
 // Initialize the page
@@ -232,6 +279,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     filterInput.value = formMonthInput.value;
                     loadOverallBudgets();
                 }
+                // Update starting balance display for selected month
+                (async function() {
+                    const sb = await fetchStartingBalanceForMonth(formMonthInput.value);
+                    const el = document.getElementById('overall_starting_balance_form');
+                    if (el) el.innerText = sb !== null ? `$ ${sb.toLocaleString()}` : '-';
+                })();
             }
         });
         formMonthInput.addEventListener('input', function() {
@@ -253,5 +306,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    loadOverallBudgets();
+    // Show starting balance for default month, then load budgets
+    (async function() {
+        const cur = formMonthInput && formMonthInput.value ? formMonthInput.value : (filterInput && filterInput.value ? filterInput.value : null);
+        if (cur) {
+            const sb = await fetchStartingBalanceForMonth(cur);
+            const el = document.getElementById('overall_starting_balance_form');
+            if (el) el.innerText = sb !== null ? `$ ${sb.toLocaleString()}` : '-';
+        }
+        loadOverallBudgets();
+    })();
 });

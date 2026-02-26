@@ -6,7 +6,7 @@ import os
 DB_HOST = "localhost"
 DB_USER = "postgres"
 # Try passwords: 'postgres' (common), 'postgresql' (from app.py), '' (empty)
-PASSWORDS_TO_TRY = ["postgres", "postgresql", "password", "", "Prim#2504"]
+PASSWORDS_TO_TRY = ["postgres", "postgresql", "password", "", "postgres"]
 
 
 def get_connection(dbname=None, password=None):
@@ -97,8 +97,8 @@ def init_dbs():
     
     # Check if we need to update passwords in files
     # This is a bit risky to auto-edit, but we can print instructions
-    if password != "postgresql":
-        print(f"NOTE: The password in app.py is 'postgresql'. Your password is '{password}'.")
+    if password != "postgres":
+        print(f"NOTE: The password in app.py is 'postgres'. Your password is '{password}'.")
         print("You might need to update DB_PASSWORD in app.py.")
     
     if password != "postgres":

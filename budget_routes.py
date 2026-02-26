@@ -23,23 +23,29 @@ def get_overall_budget_month_range():
     max_str = max_first.strftime("%Y-%m")
     return min_str, max_str
 
-DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/coffeeshop_cashflow"
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/coffeeshop_cashflow"
 engine = create_engine(DATABASE_URL, poolclass=NullPool)
 # cafe entries DB (sales-person daily records) used optionally by key-insights
-CAFE_DATABASE_URL = "postgresql://postgres:Prim#2504@localhost:5432/cafe_v2_db"
+CAFE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/cafe_v2_db"
 cafe_engine = create_engine(CAFE_DATABASE_URL, poolclass=NullPool)
 
 
 def _normalize_category_server(cat: str):
     """Normalize category names on the server to match frontend keys.
-    Examples: 'Operating Expense' -> 'Operating expense', 'COGS' stays 'COGS'.
+
+    Examples:
+      * 'Operating Expense', 'opex' -> 'Operating expense'
+      * 'COGS' stays 'COGS'
+      * returns the input string trimmed when no rule applies.
     """
     if not cat:
         return ''
     c = str(cat).strip()
-    if c.lower() == 'operating expense':
+    low = c.lower()
+    # treat common variations of operating expense
+    if low in ('operating expense', 'opex', 'operating'):
         return 'Operating expense'
-    if c.lower() == 'cogs':
+    if low == 'cogs':
         return 'COGS'
     return c
 
@@ -70,9 +76,19 @@ try:
                 description TEXT
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS payroll_budgets (
+                id SERIAL PRIMARY KEY,
+                month TEXT NOT NULL,
+                amount NUMERIC(12,2) NOT NULL,
+                description TEXT
+            )
+        """))
         # Ensure columns exist even if table was created with an older structure
         conn.execute(text("ALTER TABLE overall_budgets ADD COLUMN IF NOT EXISTS month TEXT"))
         conn.execute(text("ALTER TABLE overall_budgets ADD COLUMN IF NOT EXISTS description TEXT"))
+        conn.execute(text("ALTER TABLE payroll_budgets ADD COLUMN IF NOT EXISTS month TEXT"))
+        conn.execute(text("ALTER TABLE payroll_budgets ADD COLUMN IF NOT EXISTS description TEXT"))
         conn.commit()
         print("Budget tables created successfully")
 except Exception as e:
@@ -99,14 +115,82 @@ def _get_overall_and_category_sum(conn, month: str):
         {"month": month},
     ).mappings().one()
     overall_amount = float(overall[0]) if overall else None
-    main_sum = float(main_sum_row["total"])
+    # include payroll_budgets for the same month as part of main/category totals
+    payroll_row = conn.execute(text("SELECT COALESCE(SUM(amount),0) AS total FROM payroll_budgets WHERE month = :month"), {"month": month}).fetchone()
+    payroll_total = float(payroll_row[0]) if payroll_row else 0.0
+    main_sum = float(main_sum_row["total"]) + payroll_total
     return overall_amount, main_sum
+
+
+def _get_main_category_breakdown(conn, month: str):
+    """
+    Helper used for validation rules that depend on how many main categories
+    are already budgeted. Returns (cat_totals, payroll_total) where:
+      - cat_totals: dict like {'COGS': amount, 'Operating expense': amount, ...}
+      - payroll_total: sum of payroll_budgets for the month.
+    """
+    rows = conn.execute(
+        text(
+            """
+            SELECT category, COALESCE(SUM(amount),0) AS total
+            FROM budgets
+            WHERE month = :month AND subcategory IS NULL
+            GROUP BY category
+            """
+        ),
+        {"month": month},
+    ).mappings().all()
+    cat_totals = {row["category"]: float(row["total"] or 0) for row in rows}
+    payroll_row = conn.execute(
+        text("SELECT COALESCE(SUM(amount),0) FROM payroll_budgets WHERE month = :month"),
+        {"month": month},
+    ).fetchone()
+    payroll_total = float(payroll_row[0] or 0) if payroll_row else 0.0
+    return cat_totals, payroll_total
+
+
+def _get_payroll_base(conn):
+    """
+    Return the sum of base salaries used as the minimum payroll budget:
+      - Prefer employees.base_salary if the table exists and has data
+      - Fallback to employees_static.base_pay (used by the payroll insights API)
+    """
+    payroll_base = 0.0
+    try:
+        base_row = None
+        # Try employees.base_salary first
+        try:
+            base_row = conn.execute(text("SELECT COALESCE(SUM(base_salary),0) FROM employees")).fetchone()
+        except Exception:
+            # SELECT failed (e.g. table doesn't exist) -> rollback this failed statement
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            base_row = None
+        if base_row and float(base_row[0] or 0) > 0:
+            payroll_base = float(base_row[0] or 0)
+        else:
+            # Fallback to employees_static.base_pay
+            try:
+                base_row = conn.execute(text("SELECT COALESCE(SUM(base_pay),0) FROM employees_static")).fetchone()
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                base_row = None
+            if base_row:
+                payroll_base = float(base_row[0] or 0)
+    except Exception:
+        payroll_base = 0.0
+    return payroll_base
 
 
 def _check_category_sum_within_overall(conn, month: str, main_category_sum: float):
     """Raise if overall budget exists for month and main_category_sum exceeds it."""
     overall_amount, _ = _get_overall_and_category_sum(conn, month)
-    if overall_amount is not None and main_category_sum > overall_amount:
+    if overall_amount is not None and main_category_sum >= overall_amount:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -119,7 +203,7 @@ def _check_category_sum_within_overall(conn, month: str, main_category_sum: floa
 def _check_overall_not_below_category_sum(conn, month: str, overall_amount: float):
     """Raise if sum of main category budgets for month exceeds overall_amount."""
     _, main_sum = _get_overall_and_category_sum(conn, month)
-    if main_sum > 0 and overall_amount < main_sum:
+    if main_sum > 0 and overall_amount <= main_sum:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -160,9 +244,15 @@ def get_budgets(month: Optional[str] = None):
 
 @router.post("/api/budgets")
 def create_budget(budget: BudgetModel):
+    # normalize user input so that database rows are consistent and later
+    # comparisons (especially in finalize) are simpler
+    budget_month = budget.month
+    cat = _normalize_category_server(budget.category)
+    sub = budget.subcategory.strip() if budget.subcategory else None
+
     with engine.connect() as conn:
         # Category budgets require an overall budget for the same month first
-        _require_overall_budget_for_month(conn, budget.month)
+        _require_overall_budget_for_month(conn, budget_month)
         # Prevent duplicate budget for same month + category + subcategory
         existing = conn.execute(
             text(
@@ -177,9 +267,9 @@ def create_budget(budget: BudgetModel):
                 """
             ),
             {
-                "month": budget.month,
-                "category": budget.category,
-                "subcategory": budget.subcategory,
+                "month": budget_month,
+                "category": cat,
+                "subcategory": sub,
             },
         ).fetchone()
         if existing:
@@ -189,7 +279,7 @@ def create_budget(budget: BudgetModel):
             )
 
         # Budget hierarchy rules between main category and sub-categories
-        if budget.subcategory not in (None, ""):
+        if sub not in (None, ""):
             # Sub-category: main category budget must exist first, and total sub-categories must not exceed it
             main_row = conn.execute(
                 text(
@@ -201,8 +291,8 @@ def create_budget(budget: BudgetModel):
                     """
                 ),
                 {
-                    "month": budget.month,
-                    "category": budget.category,
+                    "month": budget_month,
+                    "category": cat,
                 },
             ).fetchone()
 
@@ -210,8 +300,8 @@ def create_budget(budget: BudgetModel):
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"No main {budget.category} budget found for {budget.month}. "
-                        f"Please create the main {budget.category} budget first."
+                        f"No main {cat} budget found for {budget_month}. "
+                        f"Please create the main {cat} budget first."
                     ),
                 )
 
@@ -227,8 +317,8 @@ def create_budget(budget: BudgetModel):
                     """
                 ),
                 {
-                    "month": budget.month,
-                    "category": budget.category,
+                    "month": budget_month,
+                    "category": cat,
                 },
             ).mappings().one()
 
@@ -275,9 +365,42 @@ def create_budget(budget: BudgetModel):
                 )
 
         # Category budgets must belong to an overall budget (same month): sum of main category budgets <= overall budget
-        _, current_main_sum = _get_overall_and_category_sum(conn, budget.month)
-        new_main_sum = current_main_sum + (float(budget.amount) if budget.subcategory in (None, "") else 0)
+        overall_amount, current_main_sum = _get_overall_and_category_sum(conn, budget_month)
+        new_main_sum = current_main_sum + (float(budget.amount) if sub in (None, "") else 0)
+
+        # first verify we aren't pushing the main categories past the overall budget;
+        # this error message triggers the front-end finalize panel.  perform this
+        # check before the "90% rule" below so that attempted overrun results in
+        # the more actionable overrun message instead of the 90% warning.
         _check_category_sum_within_overall(conn, budget.month, new_main_sum)
+
+        # Extra rule: if after this main-category change only 2 of the 3 main categories
+        # (COGS, Operating expense, Payroll) are non-zero, their combined total must not
+        # exceed 90% of the overall budget. This leaves at least 10% room for the last category.
+        # only enforce the 90% rule when the overall budget has not already been exceeded,
+        # since the overrun check above already rejected those cases.
+        if overall_amount is not None and sub in (None, ""):
+            cat_totals, payroll_total = _get_main_category_breakdown(conn, budget_month)
+            cat_name = _normalize_category_server(cat)
+            cogs_after = float(cat_totals.get("COGS", 0.0))
+            opex_after = float(cat_totals.get("Operating expense", 0.0))
+            if cat_name == "COGS":
+                cogs_after += float(budget.amount)
+            elif cat_name == "Operating expense":
+                opex_after += float(budget.amount)
+            main_sum_after = cogs_after + opex_after + payroll_total
+            active_count = (1 if cogs_after > 0 else 0) + (1 if opex_after > 0 else 0) + (1 if payroll_total > 0 else 0)
+            if active_count == 2:
+                max_two_cat_sum = overall_amount * 0.9
+                if main_sum_after > max_two_cat_sum:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"With only two main categories budgeted, their total (${main_sum_after:,.0f}) "
+                            f"must not exceed 90% of the overall budget (${overall_amount:,.0f}) so that the "
+                            "remaining category can still be budgeted."
+                        ),
+                    )
 
         query = text(
             """
@@ -289,9 +412,9 @@ def create_budget(budget: BudgetModel):
         result = conn.execute(
             query,
             {
-                "month": budget.month,
-                "category": budget.category,
-                "subcategory": budget.subcategory,
+                "month": budget_month,
+                "category": cat,
+                "subcategory": sub,
                 "amount": budget.amount,
             },
         )
@@ -301,9 +424,14 @@ def create_budget(budget: BudgetModel):
 
 @router.put("/api/budgets/{budget_id}")
 def update_budget(budget_id: int, budget: BudgetModel):
+    # normalize inputs
+    budget_month = budget.month
+    cat = _normalize_category_server(budget.category)
+    sub = budget.subcategory.strip() if budget.subcategory else None
+
     with engine.connect() as conn:
         # Category budgets require an overall budget for the same month first
-        _require_overall_budget_for_month(conn, budget.month)
+        _require_overall_budget_for_month(conn, budget_month)
         # Prevent changing into a duplicate month + category + subcategory of another row
         existing = conn.execute(
             text(
@@ -319,9 +447,9 @@ def update_budget(budget_id: int, budget: BudgetModel):
                 """
             ),
             {
-                "month": budget.month,
-                "category": budget.category,
-                "subcategory": budget.subcategory,
+                "month": budget_month,
+                "category": cat,
+                "subcategory": sub,
                 "id": budget_id,
             },
         ).fetchone()
@@ -629,6 +757,218 @@ def delete_overall_budget(budget_id: int):
     return {"message": "Overall budget deleted successfully"}
 
 
+# --- PAYROLL BUDGETS API ---
+class PayrollBudgetModel(BaseModel):
+    month: str
+    amount: float
+    description: Optional[str] = None
+
+
+@router.get("/api/payroll_budgets")
+def get_payroll_budgets(month: Optional[str] = None):
+    query_str = "SELECT * FROM payroll_budgets"
+    params = {}
+    if month:
+        query_str += " WHERE month = :month"
+        params["month"] = month
+    query_str += " ORDER BY month DESC"
+    with engine.connect() as conn:
+        rows = conn.execute(text(query_str), params).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.post("/api/payroll_budgets")
+def create_payroll_budget(budget: PayrollBudgetModel):
+    min_month, max_month = get_overall_budget_month_range()
+    if not (min_month <= budget.month <= max_month):
+        raise HTTPException(status_code=400, detail=f"You can only set budgets from {min_month} up to {max_month}. Past and future months are not allowed.")
+    with engine.connect() as conn:
+        # Require an overall budget for this month
+        _require_overall_budget_for_month(conn, budget.month)
+
+        # Prevent duplicate for same month
+        existing = conn.execute(text("SELECT id FROM payroll_budgets WHERE month = :month"), {"month": budget.month}).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Payroll budget already exists for this month")
+
+        # Ensure sum of main categories + this payroll budget does not exceed overall budget,
+        # and if this makes only 2 of the 3 main categories non-zero, reserve at least 10% for the last one.
+        # Also ensure payroll budget is never below the sum of base salaries.
+        overall_amount, main_sum = _get_overall_and_category_sum(conn, budget.month)
+        if overall_amount is not None:
+            cat_totals, current_payroll = _get_main_category_breakdown(conn, budget.month)
+            payroll_after = current_payroll + float(budget.amount)
+            cogs_amount = float(cat_totals.get("COGS", 0.0))
+            opex_amount = float(cat_totals.get("Operating expense", 0.0))
+            main_sum_after = cogs_amount + opex_amount + payroll_after
+
+            # Standard rule: total must be < overall
+            if main_sum_after >= overall_amount:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Sum of main category budgets including payroll ({main_sum_after}) "
+                        f"must be less than overall budget ({overall_amount}) for {budget.month}."
+                    ),
+                )
+
+            # Extra rule: when only two categories are non-zero (e.g. COGS + Operating, or
+            # COGS + Payroll, etc.), require that they do not consume more than 90% of overall.
+            active_count = (1 if cogs_amount > 0 else 0) + (1 if opex_amount > 0 else 0) + (1 if payroll_after > 0 else 0)
+            if active_count == 2:
+                max_two_cat_sum = overall_amount * 0.9
+                if main_sum_after > max_two_cat_sum:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"With only two main categories budgeted, their total (${main_sum_after:,.0f}) "
+                            f"must not exceed 90% of the overall budget (${overall_amount:,.0f}) so that the "
+                            "remaining category can still be budgeted."
+                        ),
+                    )
+
+            # New rule: payroll budget must be at least the sum of base salaries
+            payroll_base = _get_payroll_base(conn)
+            if payroll_base and payroll_after < payroll_base:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Payroll budget for {budget.month} (${payroll_after:,.0f}) "
+                        f"cannot be less than total base salaries (${payroll_base:,.0f}). "
+                        "Increase the payroll budget or reduce base salaries."
+                    ),
+                )
+
+        q = text("""
+            INSERT INTO payroll_budgets (month, amount, description)
+            VALUES (:month, :amount, :description)
+            RETURNING id
+        """)
+        result = conn.execute(q, {"month": budget.month, "amount": budget.amount, "description": budget.description})
+        conn.commit()
+        new_id = result.scalar()
+    return {"id": new_id, "message": "Payroll budget created successfully"}
+
+
+@router.put("/api/payroll_budgets/{budget_id}")
+def update_payroll_budget(budget_id: int, budget: PayrollBudgetModel):
+    min_month, max_month = get_overall_budget_month_range()
+    if not (min_month <= budget.month <= max_month):
+        raise HTTPException(status_code=400, detail=f"You can only set budgets from {min_month} up to {max_month}. Past and future months are not allowed.")
+    q = text("""
+        UPDATE payroll_budgets
+        SET month = :month, amount = :amount, description = :description
+        WHERE id = :id
+    """)
+    with engine.connect() as conn:
+        # fetch existing row to compute adjusted sums if updating same month
+        old = conn.execute(text("SELECT month, amount FROM payroll_budgets WHERE id = :id"), {"id": budget_id}).fetchone()
+        if not old:
+            raise HTTPException(status_code=404, detail="Payroll budget not found")
+
+        # Require overall budget for target month
+        _require_overall_budget_for_month(conn, budget.month)
+
+        # Compute new main sum for the target month (subtract old amount if same month)
+        overall_amount, main_sum = _get_overall_and_category_sum(conn, budget.month)
+        adjusted_main_sum = main_sum
+        try:
+            old_month = old[0]
+            old_amount = float(old[1] or 0)
+        except Exception:
+            old_month = None
+            old_amount = 0.0
+
+        if old_month == budget.month:
+            adjusted_main_sum = main_sum - old_amount + float(budget.amount)
+        else:
+            adjusted_main_sum = main_sum + float(budget.amount)
+
+        if overall_amount is not None:
+            # Standard rule: total must be < overall
+            if adjusted_main_sum >= overall_amount:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Sum of main category budgets including payroll ({adjusted_main_sum}) "
+                        f"must be less than overall budget ({overall_amount}) for {budget.month}."
+                    ),
+                )
+
+            # Extra rule: when only two categories are non-zero after this change,
+            # require that they do not consume more than 90% of overall.
+            cat_totals, current_payroll = _get_main_category_breakdown(conn, budget.month)
+            # remove old payroll from breakdown if it belonged to this month, then add new
+            if old_month == budget.month:
+                payroll_after = current_payroll - old_amount + float(budget.amount)
+            else:
+                payroll_after = current_payroll + float(budget.amount)
+
+            cogs_amount = float(cat_totals.get("COGS", 0.0))
+            opex_amount = float(cat_totals.get("Operating expense", 0.0))
+            main_sum_after = cogs_amount + opex_amount + payroll_after
+
+            # 90% rule when only two categories are non-zero
+            active_count = (1 if cogs_amount > 0 else 0) + (1 if opex_amount > 0 else 0) + (1 if payroll_after > 0 else 0)
+            if active_count == 2:
+                max_two_cat_sum = overall_amount * 0.9
+                if main_sum_after > max_two_cat_sum:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"With only two main categories budgeted, their total (${main_sum_after:,.0f}) "
+                            f"must not exceed 90% of the overall budget (${overall_amount:,.0f}) so that the "
+                            "remaining category can still be budgeted."
+                        ),
+                    )
+
+            # New rule: payroll budget must be at least the sum of base salaries
+            payroll_base = _get_payroll_base(conn)
+            if payroll_base and payroll_after < payroll_base:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Payroll budget for {budget.month} (${payroll_after:,.0f}) "
+                        f"cannot be less than total base salaries (${payroll_base:,.0f}). "
+                        "Increase the payroll budget or reduce base salaries."
+                    ),
+                )
+        result = conn.execute(q, {"month": budget.month, "amount": budget.amount, "description": budget.description, "id": budget_id})
+        conn.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Payroll budget not found")
+    return {"message": "Payroll budget updated successfully"}
+
+
+@router.delete("/api/payroll_budgets/{budget_id}")
+def delete_payroll_budget(budget_id: int):
+    # Prevent deletion of ongoing (current-month) payroll budgets
+    q_sel = text("SELECT month FROM payroll_budgets WHERE id = :id")
+    with engine.connect() as conn:
+        row = conn.execute(q_sel, {"id": budget_id}).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Payroll budget not found")
+        # `fetchone()` returns a Row; use index access (first column is month)
+        try:
+            budget_month = row[0]
+        except Exception:
+            # Fallback to mapping access if available
+            try:
+                budget_month = row['month']
+            except Exception:
+                budget_month = None
+        current_month = date.today().strftime("%Y-%m")
+        if budget_month == current_month:
+            raise HTTPException(status_code=400, detail="Cannot delete ongoing payroll budget for the current month")
+
+        q = text("DELETE FROM payroll_budgets WHERE id = :id")
+        result = conn.execute(q, {"id": budget_id})
+        conn.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Payroll budget not found")
+    return {"message": "Payroll budget deleted successfully"}
+
+
 # --- KEY INSIGHTS (aggregates budgets + expenses for a month) ---
 @router.get("/api/key-insights")
 def get_key_insights(
@@ -877,3 +1217,339 @@ def get_sum_labor_cost(month: str = None):
     with cafe_engine.connect() as conn:
         row = conn.execute(text(query), params).fetchone()
     return {"labor_cost_sum": float(row[0])}
+
+
+# --- KPI endpoints and finalize logic ---
+@router.get('/api/budget-summary')
+def get_budget_summary(month: str = Query(..., description="Month YYYY-MM")):
+    """Return overall and main_sum (COGS + Operating + Payroll) for overrun detection. Uses same logic as validation."""
+    with engine.connect() as conn:
+        overall_amount, main_sum = _get_overall_and_category_sum(conn, month)
+    return {
+        "month": month,
+        "overall": overall_amount,
+        "main_sum": round(main_sum, 2),
+        "overrun": overall_amount is not None and main_sum > overall_amount,
+    }
+
+
+@router.get('/api/kpis')
+def get_kpis(month: Optional[str] = None):
+    """Return four small KPIs for the requested month: overall, COGS, Operating expense, Payroll.
+    Each KPI includes: budgeted, payroll/base (for payroll KPI), and percent_of_overall.
+    """
+    if not month:
+        raise HTTPException(status_code=400, detail="month is required in YYYY-MM format")
+    with engine.connect() as conn:
+        # overall budget for month
+        overall_row = conn.execute(text("SELECT amount FROM overall_budgets WHERE month = :month"), {"month": month}).fetchone()
+        overall = float(overall_row[0]) if overall_row else None
+
+        # main category budgets (subcategory IS NULL)
+        rows = conn.execute(text(
+            "SELECT category, COALESCE(SUM(amount),0) AS total FROM budgets WHERE month = :month AND subcategory IS NULL GROUP BY category"
+        ), {"month": month}).mappings().all()
+        cat_map = {r['category']: float(r['total']) for r in rows}
+
+        # payroll budget
+        payroll_row = conn.execute(text("SELECT COALESCE(SUM(amount),0) FROM payroll_budgets WHERE month = :month"), {"month": month}).fetchone()
+        payroll_budget = float(payroll_row[0]) if payroll_row else 0.0
+
+        # attempt to fetch base payroll (sum of base salaries) if employees table exists
+        payroll_base = 0.0
+        try:
+            base_row = conn.execute(text("SELECT COALESCE(SUM(base_salary),0) FROM employees")).fetchone()
+            if base_row:
+                payroll_base = float(base_row[0])
+        except Exception:
+            payroll_base = 0.0
+
+        cogs = cat_map.get('COGS', 0.0)
+        opex = cat_map.get('Operating expense', 0.0)
+
+        def pct(x):
+            try:
+                return round((x / overall) * 100, 1) if overall and overall > 0 else None
+            except Exception:
+                return None
+
+        return {
+            'month': month,
+            'overall': {'budgeted': overall},
+            'cogs': {'budgeted': cogs, 'percent_of_overall': pct(cogs)},
+            'operating': {'budgeted': opex, 'percent_of_overall': pct(opex)},
+            'payroll': {'budgeted': payroll_budget, 'base': payroll_base, 'percent_of_overall': pct(payroll_budget)}
+        }
+
+
+@router.post('/api/finalize-budgets')
+
+def finalize_budgets(month: str = Query(..., description="Month in YYYY-MM format"),
+                     pending_category: Optional[str] = Query(None, description="Category of an unsaved budget to include"),
+                     pending_amount: Optional[float] = Query(None, description="Amount of an unsaved budget to include")):
+    """Finalize budgets for a month by computing a scaling factor and applying it to main category budgets.
+    Ensures payroll is not scaled below base payroll (from `employees.base_salary` if available).
+    If `pending_category`/`pending_amount` are provided they are treated as an additional
+    budget entry (used when the user attempted to save a category and hit overrun).
+    Returns the applied factor and updated amounts.
+    """
+    with engine.connect() as conn:
+        try:
+            # fetch overall
+            try:
+                overall_row = conn.execute(text("SELECT amount FROM overall_budgets WHERE month = :month"), {"month": month}).fetchone()
+            except Exception as e:
+                print(f"[finalize_budgets] error fetching overall for {month}: {e}")
+                raise
+            if not overall_row:
+                raise HTTPException(status_code=400, detail=f"No overall budget set for {month}")
+            overall = float(overall_row[0])
+
+            # fetch main categories totals (COGS and Operating expense) - we'll keep track of ids
+            try:
+                rows = conn.execute(text(
+                    "SELECT id, category, COALESCE(amount,0) AS amount FROM budgets WHERE month = :month AND subcategory IS NULL"
+                ), {"month": month}).mappings().all()
+            except Exception as e:
+                print(f"[finalize_budgets] error fetching budget rows for {month}: {e}")
+                raise
+            cat_rows = list(rows)
+            # map by normalized category name for easier access
+            cat_map = {r['category']: float(r['amount']) for r in cat_rows}
+            cogs_amt = float(cat_map.get('COGS', 0.0))
+            opex_amt = float(cat_map.get('Operating expense', 0.0))
+
+            # include payroll_budgets in original main sum for factor reporting
+            try:
+                p_row = conn.execute(text("SELECT id, COALESCE(amount,0) FROM payroll_budgets WHERE month = :month"), {"month": month}).fetchone()
+            except Exception as e:
+                print(f"[finalize_budgets] error fetching payroll row for {month}: {e}")
+                raise
+            payroll_amount = float(p_row[1]) if p_row else 0.0
+            payroll_id = int(p_row[0]) if p_row and p_row[0] is not None else None
+
+            # if there's a pending (unsaved) budget, include it now for calculations
+            if pending_category and pending_amount is not None:
+                cat = str(pending_category).strip()
+                if cat.lower() == 'cogs':
+                    cogs_amt += float(pending_amount)
+                elif cat.lower() == 'operating expense':
+                    opex_amt += float(pending_amount)
+                elif cat.lower() == 'payroll':
+                    payroll_amount += float(pending_amount)
+                # note: we do not immediately insert a row here; the later upsert logic
+                # will take care of creating the missing main category entry if needed.
+
+            main_sum = cogs_amt + opex_amt + payroll_amount
+            if main_sum == 0:
+                raise HTTPException(status_code=400, detail="No main category budgets to scale")
+
+            # get payroll base using shared helper
+            payroll_base = _get_payroll_base(conn)
+
+            # payroll should not be scaled down below either its current amount or its base
+            payroll_target = payroll_amount
+            if payroll_base and payroll_target < payroll_base:
+                payroll_target = payroll_base
+            # compute how much of the overall remains for COGS + OPEX
+            remaining = overall - payroll_target
+            warning_msg = None
+            if remaining < 0:
+                # We used to abort here because the payroll base alone exceeded
+                # the overall budget.  That prevented any COGS/OPEX rows from
+                # being created and left the caller confused ("OPEX never got
+                # a budget").  Instead of blowing up we'll proceed but reserve
+                # *all* of the budget for payroll and shrink the other two
+                # categories to a very small non‑zero amount.  The frontend can
+                # still inspect the returned factor/updates and display an error
+                # if desired.
+                warning_msg = (
+                    f"Overall budget ({overall}) is smaller than payroll base "
+                    f"({payroll_base}); COGS/OPEX were scaled to minimal values."
+                )
+                print(f"[finalize_budgets] {warning_msg}")
+                remaining = 0
+
+            # determine new amounts for COGS and OPEX based on their current (and pending) values
+            if cogs_amt > 0 and opex_amt > 0:
+                sub_factor = remaining / (cogs_amt + opex_amt)
+                new_cogs = round(cogs_amt * sub_factor, 2)
+                new_opex = round(opex_amt * sub_factor, 2)
+            else:
+                # if one or both categories had no budget, split remaining evenly so each gets some
+                new_cogs = round(remaining / 2, 2)
+                new_opex = round(remaining / 2, 2)
+
+            # enforce minimum nonzero
+            if new_cogs <= 0:
+                new_cogs = 0.01
+            if new_opex <= 0:
+                new_opex = 0.01
+
+            # payroll amount is fixed at payroll_target (no scaling down)
+            new_payroll_amount = round(payroll_target, 2)
+
+            # compute a factor representing how cogs+opex changed relative to prior sum
+            prior_cats = cogs_amt + opex_amt
+            if prior_cats > 0:
+                factor = remaining / prior_cats
+            else:
+                # nothing to scale (both cats zero) so factor 1 keeps subcategories unchanged
+                factor = 1
+
+            # apply updated values back to the DB
+            updates = []
+            # helper to upsert a main category row
+            def _upsert_main(cat_name, amount):
+                nonlocal updates
+                # look for an existing row using normalized names so that
+                # variants like "OPEX" vs "Operating expense" don't cause a
+                # duplicate to be inserted.
+                def _norm(s):
+                    return _normalize_category_server(s or '').lower()
+                row = next((r for r in cat_rows if _norm(r['category']) == _norm(cat_name)), None)
+                if row:
+                    cid = int(row['id'])
+                    old = float(row['amount'])
+                    try:
+                        conn.execute(text("UPDATE budgets SET amount = :amount WHERE id = :id"), {"amount": amount, "id": cid})
+                        updates.append({'id': cid, 'category': cat_name, 'old': old, 'new': amount})
+                    except Exception as e:
+                        print(f"[finalize_budgets] failed updating budget id={cid}: {e}")
+                        conn.rollback()
+                        raise HTTPException(status_code=500, detail=f"Failed updating budget id={cid}: {str(e)}")
+                else:
+                    # insert row when category was missing
+                    try:
+                        res = conn.execute(text("INSERT INTO budgets (month, category, subcategory, amount) VALUES (:month, :cat, NULL, :amt) RETURNING id"), {"month": month, "cat": cat_name, "amt": amount})
+                        new_id = None
+                        try:
+                            new_id = int(res.fetchone()[0])
+                        except Exception:
+                            try:
+                                new_id = int(res.scalar())
+                            except Exception:
+                                new_id = None
+                        updates.append({'id': new_id, 'category': cat_name, 'old': 0, 'new': amount})
+                    except Exception as e:
+                        print(f"[finalize_budgets] failed inserting {cat_name} row: {e}")
+                        conn.rollback()
+                        raise HTTPException(status_code=500, detail=f"Failed inserting budget for {cat_name}: {str(e)}")
+
+            # update/insert categories
+            _upsert_main('COGS', new_cogs)
+            _upsert_main('Operating expense', new_opex)
+
+            # scale subcategory budget rows by the same factor so subcategory totals match main category
+            try:
+                sub_rows = conn.execute(text(
+                    "SELECT id, COALESCE(amount,0) AS amount FROM budgets WHERE month = :month AND subcategory IS NOT NULL"
+                ), {"month": month}).mappings().all()
+                for r in sub_rows:
+                    sid = int(r['id'])
+                    old = float(r['amount'])
+                    new_amt = round(old * factor, 2)
+                    # never drive a previously-budgeted subcategory all the way to 0
+                    if old > 0 and new_amt <= 0:
+                        new_amt = 0.01
+                    conn.execute(text("UPDATE budgets SET amount = :amount WHERE id = :id"), {"amount": new_amt, "id": sid})
+                    updates.append({'id': sid, 'category': None, 'old': old, 'new': new_amt})
+            except Exception as e:
+                print(f"[finalize_budgets] error scaling subcategory rows: {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                raise HTTPException(status_code=500, detail=f"Failed scaling subcategory budgets: {str(e)}")
+
+            # update payroll_budgets row if exists
+            if payroll_id is not None:
+                try:
+                    conn.execute(text("UPDATE payroll_budgets SET amount = :amount WHERE id = :id"), {"amount": new_payroll_amount, "id": payroll_id})
+                except Exception as e:
+                    print(f"[finalize_budgets] failed updating payroll id={payroll_id}: {e}")
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    raise HTTPException(status_code=500, detail=f"Failed updating payroll id={payroll_id}: {str(e)}")
+            else:
+                # create payroll row if it did not exist and new_payroll_amount > 0
+                if new_payroll_amount > 0:
+                    try:
+                        res = conn.execute(text("INSERT INTO payroll_budgets (month, amount, description) VALUES (:month, :amount, :desc) RETURNING id"), {"month": month, "amount": new_payroll_amount, "desc": 'Scaled payroll on finalize'})
+                        try:
+                            payroll_id = int(res.fetchone()[0])
+                        except Exception:
+                            # some DB drivers return scalar differently
+                            try:
+                                payroll_id = int(res.scalar())
+                            except Exception:
+                                payroll_id = None
+                    except Exception as e:
+                        print(f"[finalize_budgets] failed inserting payroll row: {e}")
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        raise HTTPException(status_code=500, detail=f"Failed inserting payroll row: {str(e)}")
+
+            conn.commit()
+
+            result = {
+                'month': month,
+                'factor': round(factor, 6),
+                'updates': updates,
+                'payroll': {'id': payroll_id, 'old': payroll_amount, 'new': new_payroll_amount}
+            }
+            if warning_msg:
+                result['warning'] = warning_msg
+            return result
+        except Exception as e:
+            # print for server logs and return a clear HTTP error with diagnostic info
+            print(f"[finalize_budgets] error while finalizing {month}: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise HTTPException(status_code=500, detail=f"Finalize error: {str(e)}")
+
+
+@router.get("/api/employees")
+def get_employees():
+    """Return active employees from employees_static (exclude employees_inactive)."""
+    out = []
+    try:
+        with engine.connect() as conn:
+            # load inactive ids/names if table exists
+            inactive_ids = set()
+            inactive_names = set()
+            try:
+                rows_inactive = conn.execute(text("SELECT employee_id, employee_name FROM employees_inactive")).mappings().all()
+                for r in rows_inactive:
+                    if r.get('employee_id'):
+                        inactive_ids.add(r.get('employee_id'))
+                    if r.get('employee_name'):
+                        inactive_names.add(r.get('employee_name'))
+            except Exception:
+                # table may not exist; ignore
+                pass
+
+            try:
+                rows = conn.execute(text("SELECT employee_id, employee_name, role, base_pay FROM employees_static ORDER BY employee_id")).mappings().all()
+                for r in rows:
+                    emp_id = r.get('employee_id')
+                    name = r.get('employee_name')
+                    if (emp_id and emp_id in inactive_ids) or (name and name in inactive_names):
+                        continue
+                    out.append({
+                        'employee_id': emp_id,
+                        'employee_name': name,
+                        'role': r.get('role'),
+                        'base_pay': float(r.get('base_pay') or 0)
+                    })
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return out

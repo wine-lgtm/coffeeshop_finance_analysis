@@ -14,8 +14,120 @@ app.secret_key = 'supersecretkey'
 DB_NAME = "cafe_v2_db"
 REPORTING_DB_NAME = "coffeeshop_cashflow"
 DB_USER = "postgres"
-DB_PASSWORD = "Prim#2504"
+DB_PASSWORD = "postgres"
 DB_HOST = "localhost"
+PAYROLL_BONUS_MAX_RATIO = 0.15
+EMPLOYEE_FALLBACK = {
+    "Arthur Morgan": ("E001", "Manager", 300.0),
+    "Elena Fisher": ("E002", "Cashier", 180.0),
+    "Victor Sullivan": ("E003", "Barista", 160.0),
+    "Chloe Frazer": ("E004", "Barista", 160.0),
+    "Leon Kennedy": ("E005", "Waiter", 120.0),
+    "Claire Redfield": ("E006", "Waiter", 120.0),
+    "Jill Valentine": ("E007", "Waiter", 120.0),
+}
+
+def fetch_employees_from_reporting():
+    data = {}
+    try:
+        conn = get_reporting_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS employees_static (
+                    employee_id TEXT PRIMARY KEY,
+                    employee_name TEXT NOT NULL,
+                    role TEXT,
+                    base_pay NUMERIC(10,2) NOT NULL
+                )
+                """
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        try:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS employees_inactive (
+                    employee_id TEXT,
+                    employee_name TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        inactive_ids = set()
+        inactive_names = set()
+        cur.execute(
+            """
+            SELECT employee_id, employee_name
+            FROM employees_inactive
+            """
+        )
+        inactive_rows = cur.fetchall()
+        for emp_id, name in inactive_rows:
+            if emp_id:
+                inactive_ids.add(emp_id)
+            if name:
+                inactive_names.add(name)
+        cur.execute(
+            """
+            SELECT employee_id, employee_name, role, base_pay
+            FROM employees_static
+            ORDER BY employee_id
+            """
+        )
+        rows_static = cur.fetchall()
+        for emp_id, name, role, base_pay in rows_static:
+            if emp_id in inactive_ids or name in inactive_names:
+                continue
+            data[name] = {
+                "employee_id": emp_id,
+                "employee_name": name,
+                "role": role,
+                "base_pay": float(base_pay or 0),
+                "source": "static",
+            }
+        cur.execute(
+            """
+            SELECT employee_id, employee_name, role, MAX(net_pay) AS base_pay
+            FROM payroll_history
+            GROUP BY employee_id, employee_name, role
+            ORDER BY employee_id
+            """
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        for emp_id, name, role, base_pay in rows:
+            if emp_id in inactive_ids or name in inactive_names:
+                continue
+            if name in data:
+                continue
+            data[name] = {
+                "employee_id": emp_id,
+                "employee_name": name,
+                "role": role,
+                "base_pay": float(base_pay or 0),
+                "source": "history",
+            }
+    except Exception:
+        data = {}
+    if not data:
+        for name, value in EMPLOYEE_FALLBACK.items():
+            if name in inactive_names:
+                continue
+            emp_id, role, base_pay = value
+            data[name] = {
+                "employee_id": emp_id,
+                "employee_name": name,
+                "role": role,
+                "base_pay": base_pay,
+                "source": "fallback",
+            }
+    return data
 
 def get_db_connection():
     return psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
@@ -106,6 +218,7 @@ def import_entries():
     cur = conn.cursor()
     r_conn = get_reporting_db_connection()
     r_cur = r_conn.cursor()
+    employees_map = fetch_employees_from_reporting()
     inserted = 0
     for raw in rows:
         kv = {str(k).strip().lower(): raw[k] for k in raw.keys()}
@@ -148,12 +261,21 @@ def import_entries():
             inserted += 1
             if (category or '').strip().lower() in ('payroll', 'payroll/labor'):
                 try:
+                    employee_name = desc
+                    info = employees_map.get(employee_name.strip()) if employee_name else None
+                    if info:
+                        employee_id = info["employee_id"]
+                        employee_role = info["role"]
+                    else:
+                        employee_id = "UNKNOWN"
+                        employee_role = None
+                    net_pay = float(amount)
                     r_cur.execute(
                         """
-                        INSERT INTO payroll_history (employee_name, pay_date, total_business_cost, role)
-                        VALUES (%s, %s, %s, 'Employee')
+                        INSERT INTO payroll_history (employee_id, employee_name, role, pay_date, net_pay)
+                        VALUES (%s, %s, %s, %s, %s)
                         """,
-                        (desc, date_val, amount)
+                        (employee_id, employee_name, employee_role, date_val, net_pay)
                     )
                 except Exception as e:
                     print(f"Sync payroll failed: {e}")
@@ -188,6 +310,121 @@ def import_entries():
     print(f"Imported {inserted} entries from file: {f.filename}")
     return redirect(url_for('add_data', role=role, origin=origin))
 
+@app.route('/add_employee', methods=['POST'])
+def add_employee():
+    role = request.form.get('role', 'admin')
+    origin = request.form.get('origin', 'http://127.0.0.1:8080')
+    name = (request.form.get('employee_name') or '').strip()
+    employee_role = (request.form.get('employee_role') or '').strip()
+    base_raw = request.form.get('base_pay')
+    try:
+        base_pay = float(base_raw) if base_raw not in (None, '') else 0.0
+    except Exception:
+        try:
+            base_pay = float(str(base_raw).replace(',', ''))
+        except Exception:
+            base_pay = 0.0
+    if not name or not employee_role or base_pay <= 0:
+        flash("Enter employee name, role and base pay.")
+        return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+    try:
+        conn = get_reporting_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS employees_static (
+                employee_id TEXT PRIMARY KEY,
+                employee_name TEXT NOT NULL,
+                role TEXT,
+                base_pay NUMERIC(10,2) NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS employees_inactive (
+                employee_id TEXT,
+                employee_name TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            DELETE FROM employees_inactive
+            WHERE employee_name = %s
+            """,
+            (name,),
+        )
+        emp_id = f"E{uuid.uuid4().hex[:5].upper()}"
+        cur.execute(
+            """
+            INSERT INTO employees_static (employee_id, employee_name, role, base_pay)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (emp_id, name, employee_role, base_pay),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Employee added.")
+    except Exception as e:
+        print(f"Error adding employee: {e}")
+        flash("Could not add employee.")
+    return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+
+@app.route('/delete_employee', methods=['POST'])
+def delete_employee():
+    role = request.form.get('role', 'admin')
+    origin = request.form.get('origin', 'http://127.0.0.1:8080')
+    emp_id = request.form.get('employee_id')
+    emp_name = request.form.get('employee_name')
+    if not emp_id:
+        flash("Missing employee id.")
+        return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+    try:
+        conn = get_reporting_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            DELETE FROM employees_static
+            WHERE employee_id = %s
+            """,
+            (emp_id,),
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS employees_inactive (
+                employee_id TEXT,
+                employee_name TEXT NOT NULL
+            )
+            """
+        )
+        if emp_name:
+            cur.execute(
+                """
+                SELECT 1 FROM employees_inactive
+                WHERE employee_id = %s OR employee_name = %s
+                """,
+                (emp_id, emp_name),
+            )
+            exists = cur.fetchone()
+            if not exists:
+                cur.execute(
+                    """
+                    INSERT INTO employees_inactive (employee_id, employee_name)
+                    VALUES (%s, %s)
+                    """,
+                    (emp_id, emp_name),
+                )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Employee removed.")
+    except Exception as e:
+        print(f"Error deleting employee: {e}")
+        flash("Could not remove employee.")
+    return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+
 # Manage Cash Entry
 # POST: add one entry, then sync to reporting
 # GET: list with filters and totals
@@ -195,16 +432,79 @@ def import_entries():
 def add_data():
     role = request.args.get('role', 'sale')
     origin = request.args.get('origin', 'http://127.0.0.1:8080')
+    view = request.args.get('view', 'daily')
     if request.method == 'POST':
-        # Preserve role and origin in redirect
-        origin = request.form.get('origin', origin)
-        
         date_entry = request.form['date']
+        view = request.form.get('view', view)
         entry_type = request.form['entry_type']
         category = request.form['category']
-        description = request.form['description']
+        description = request.form.get('description') or ''
         details = request.form.get('details') or None
+        employee_id = None
+        employee_id = None
+        employee_name = None
+        employee_role = None
+        bonus_amount = 0.0
         raw_balance = request.form.get('balance')
+        date_for_check = None
+        try:
+            date_for_check = datetime.strptime(str(date_entry), "%Y-%m-%d").date()
+        except Exception:
+            date_for_check = None
+        if category == 'Payroll':
+            employee_id = request.form.get('employee_id') or None
+            employee_name = request.form.get('employee_name') or description
+            employee_role = request.form.get('employee_role') or None
+            base_raw = request.form.get('base_pay')
+            bonus_raw = request.form.get('bonus')
+            try:
+                base_pay = float(base_raw) if base_raw not in (None, '') else 0.0
+            except Exception:
+                try:
+                    base_pay = float(str(base_raw).replace(',', ''))
+                except Exception:
+                    base_pay = 0.0
+            try:
+                bonus_amount = float(bonus_raw) if bonus_raw not in (None, '') else 0.0
+            except Exception:
+                try:
+                    bonus_amount = float(str(bonus_raw).replace(',', ''))
+                except Exception:
+                    bonus_amount = 0.0
+            if bonus_amount < 0:
+                bonus_amount = 0.0
+            # Backend check: Bonus cannot exceed realistic limit (15% of base pay)
+            max_bonus = base_pay * PAYROLL_BONUS_MAX_RATIO
+            if bonus_amount > max_bonus:
+                bonus_amount = max_bonus
+            if base_pay <= 0:
+                flash("Select a valid employee with base pay before recording payroll.")
+                return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+            if employee_id and date_for_check:
+                try:
+                    r_conn = get_reporting_db_connection()
+                    r_cur = r_conn.cursor()
+                    r_cur.execute(
+                        """
+                        SELECT 1
+                        FROM payroll_history
+                        WHERE employee_id = %s
+                          AND DATE_TRUNC('month', pay_date) = DATE_TRUNC('month', %s::date)
+                        LIMIT 1
+                        """,
+                        (employee_id, date_for_check),
+                    )
+                    exists = r_cur.fetchone()
+                    r_cur.close()
+                    r_conn.close()
+                    if exists:
+                        flash("Payroll for this employee is already recorded for this month.")
+                        return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+                except Exception as e:
+                    print(f"Error checking monthly payroll limit: {e}")
+            net_pay = base_pay + bonus_amount
+            raw_balance = str(net_pay)
+            description = employee_name or description
         try:
             balance = float(raw_balance) if raw_balance not in (None, '') else 0.0
         except Exception:
@@ -226,24 +526,27 @@ def add_data():
         cur.close()
         conn.close()
 
-        # --- SYNC PAYROLL TO REPORTING DB ---
         if category == 'Payroll':
             try:
                 r_conn = get_reporting_db_connection()
                 r_cur = r_conn.cursor()
-                # Insert into payroll_history. 
-                # Mapping: 
-                # description -> employee_name
-                # date_entry -> pay_date
-                # balance -> total_business_cost
-                #also populate gross_pay/net_pay with the same amount or NULL as don't have breakdown
-                # But main.py uses total_business_cost for reports.
+                employees_map = fetch_employees_from_reporting()
+                if not employee_id and description:
+                    info = employees_map.get(description.strip())
+                    if info:
+                        employee_id = info["employee_id"]
+                        if not employee_role:
+                            employee_role = info["role"]
+                if not employee_name:
+                    employee_name = description
+                if not employee_id:
+                    employee_id = "UNKNOWN"
                 r_cur.execute(
                     """
-                    INSERT INTO payroll_history (employee_name, pay_date, total_business_cost, role)
-                    VALUES (%s, %s, %s, 'Employee')
+                    INSERT INTO payroll_history (employee_id, employee_name, role, pay_date, net_pay)
+                    VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (description, date_entry, balance)
+                    (employee_id, employee_name, employee_role, date_entry, balance)
                 )
                 r_conn.commit()
                 r_cur.close()
@@ -278,7 +581,7 @@ def add_data():
                 print(f"Error syncing to checking_account_main: {e}")
         # ------------------------------------
 
-        return redirect(url_for('add_data', role=role, origin=origin))
+        return redirect(url_for('add_data', role=role, origin=origin, view=view))
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     # GET: apply month/year filters and fetch rows
@@ -299,11 +602,35 @@ def add_data():
     cur.execute(sql, params)
     rows = cur.fetchall()
 
-    # Hide Payroll for non-admin (sales)
     if role != 'admin':
         rows = [r for r in rows if r['category'] != 'Payroll']
 
-    # Build category → description options from a local CSV
+    payroll_rows = []
+    if role == 'admin':
+        try:
+            r_conn = get_reporting_db_connection()
+            r_cur = r_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            
+            p_where = []
+            p_params = []
+            if year:
+                p_where.append("EXTRACT(YEAR FROM pay_date) = %s")
+                p_params.append(int(year))
+            if month:
+                p_where.append("EXTRACT(MONTH FROM pay_date) = %s")
+                p_params.append(int(month))
+            p_sql = "SELECT employee_id, employee_name, role, pay_date, net_pay FROM payroll_history"
+            if p_where:
+                p_sql += " WHERE " + " AND ".join(p_where)
+            p_sql += " ORDER BY pay_date DESC, employee_id"
+            r_cur.execute(p_sql, p_params)
+            payroll_rows = r_cur.fetchall()
+            r_cur.close()
+            r_conn.close()
+        except Exception as e:
+            print(f"Error loading payroll history: {e}")
+            payroll_rows = []
+
     import csv, os
     csv_path = os.path.join(os.path.dirname(__file__), "checking_account_main.csv")
     cat_map = {}
@@ -319,16 +646,39 @@ def add_data():
     except Exception:
         pass
     # Years for filters from existing entries
-    cur.execute("SELECT DISTINCT EXTRACT(YEAR FROM date) AS y FROM entries ORDER BY y DESC")
-    years_rows = cur.fetchall()
+    cur.execute("SELECT DISTINCT EXTRACT(YEAR FROM date) AS y FROM entries")
+    years_entries = {int(r[0]) for r in cur.fetchall()}
+    
+    # Years from payroll_history (if admin)
+    years_payroll = set()
+    if role == 'admin':
+        try:
+            r_conn = get_reporting_db_connection()
+            r_cur = r_conn.cursor()
+            r_cur.execute("SELECT DISTINCT EXTRACT(YEAR FROM pay_date) FROM payroll_history")
+            years_payroll = {int(r[0]) for r in r_cur.fetchall()}
+            r_cur.close()
+            r_conn.close()
+        except Exception:
+            pass
+
     cur.close()
     conn.close()
-    categories_map = {k: sorted(list(v)) for k, v in cat_map.items()}
+    
+    categories_map = {k: sorted(list(v)) for k, v in sorted(cat_map.items())}
     total_income = sum(float(r["balance"] or 0) for r in rows if r["entry_type"] == "income")
     total_expense = sum(float(r["balance"] or 0) for r in rows if r["entry_type"] == "expense")
-    available_years = [int(r["y"]) if isinstance(r, dict) else int(r[0]) for r in years_rows]
+    
+    available_years = sorted(list(years_entries | years_payroll), reverse=True)
+    
     selected_month = int(month) if month else None
     selected_year = int(year) if year else None
+    employees = []
+    try:
+        employees_map = fetch_employees_from_reporting()
+        employees = sorted(employees_map.values(), key=lambda e: e["employee_id"])
+    except Exception:
+        employees = []
     return render_template(
         "add_data.html",
         role=role,
@@ -341,20 +691,98 @@ def add_data():
         categories_map=categories_map,
         available_years=available_years,
         selected_month=selected_month,
-        selected_year=selected_year
+        selected_year=selected_year,
+        employees=employees,
+        payroll_rows=payroll_rows,
+        view=view
     )
 
 # Delete an entry (sales can delete within 72h)
 # First delete in reporting DB, then in entries
-@app.route('/delete_entry/<int:id>', methods=['POST'])
+@app.route('/delete_entry/<string:id>', methods=['POST'])
 def delete_entry(id):
     role = request.args.get('role', 'sale')
     origin = request.args.get('origin', 'http://127.0.0.1:8080')
+    view = request.form.get('view', 'daily')
+    
+    # Handle Payroll History Deletion (id is employee_id string)
+    if request.form.get('is_payroll') == 'true':
+        if role != 'admin':
+            return "Error: Only admin can delete payroll entries.", 403
+            
+        try:
+            pay_date = request.form.get('date')
+            employee_name = request.form.get('employee_name')
+            net_pay = float(request.form.get('net_pay'))
+            
+            r_conn = get_reporting_db_connection()
+            r_cur = r_conn.cursor()
+            
+            # Delete from payroll_history
+            r_cur.execute(
+                """
+                DELETE FROM payroll_history
+                WHERE pay_date = %s
+                  AND employee_name = %s
+                  AND net_pay = %s
+                  AND ctid IN (
+                      SELECT ctid FROM payroll_history
+                      WHERE pay_date = %s
+                        AND employee_name = %s
+                        AND net_pay = %s
+                      LIMIT 1
+                  )
+                """,
+                (pay_date, employee_name, net_pay, pay_date, employee_name, net_pay)
+            )
+            
+            # Also try to delete corresponding entry in 'entries' table if it exists
+            # This keeps both DBs in sync
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM entries
+                WHERE category = 'Payroll'
+                  AND date = %s
+                  AND description = %s
+                  AND balance = %s
+                  AND ctid IN (
+                      SELECT ctid FROM entries
+                      WHERE category = 'Payroll'
+                        AND date = %s
+                        AND description = %s
+                        AND balance = %s
+                      LIMIT 1
+                  )
+                """,
+                (pay_date, employee_name, net_pay, pay_date, employee_name, net_pay)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            r_conn.commit()
+            r_cur.close()
+            r_conn.close()
+            
+            return redirect(url_for('add_data', role=role, origin=origin, view='payroll'))
+            
+        except Exception as e:
+            print(f"Error deleting payroll entry: {e}")
+            return f"Error deleting payroll entry: {e}", 500
+
+    # Handle Normal Entry Deletion (id is integer)
+    try:
+        entry_id = int(id)
+    except ValueError:
+        return "Invalid entry ID", 400
+
     conn = get_db_connection()
     cur = conn.cursor()
     
     if role == 'sale':
-        cur.execute("SELECT created_at FROM entries WHERE id = %s", (id,))
+        cur.execute("SELECT created_at FROM entries WHERE id = %s", (entry_id,))
         result = cur.fetchone()
         if result:
             created_at = result[0]
@@ -364,7 +792,7 @@ def delete_entry(id):
     
     # --- SYNC DELETION TO REPORTING DB ---
     try:
-        cur.execute("SELECT date, entry_type, category, description, balance FROM entries WHERE id = %s", (id,))
+        cur.execute("SELECT date, entry_type, category, description, balance FROM entries WHERE id = %s", (entry_id,))
         entry_to_delete = cur.fetchone()
         if entry_to_delete:
             d_date, d_type, d_cat, d_desc, d_bal = entry_to_delete
@@ -373,17 +801,18 @@ def delete_entry(id):
             r_cur = r_conn.cursor()
             
             if d_cat == 'Payroll':
+                # Existing logic for deleting payroll from entries table
                 r_cur.execute(
                     """
                     DELETE FROM payroll_history
                     WHERE pay_date = %s
                       AND employee_name = %s
-                      AND total_business_cost = %s
+                      AND net_pay = %s
                       AND ctid IN (
                           SELECT ctid FROM payroll_history
                           WHERE pay_date = %s
                             AND employee_name = %s
-                            AND total_business_cost = %s
+                            AND net_pay = %s
                           LIMIT 1
                       )
                     """,
@@ -418,7 +847,7 @@ def delete_entry(id):
         print(f"Error syncing deletion: {e}")
     # -------------------------------------
 
-    cur.execute("DELETE FROM entries WHERE id = %s", (id,))
+    cur.execute("DELETE FROM entries WHERE id = %s", (entry_id,))
     conn.commit()
     cur.close()
     conn.close()

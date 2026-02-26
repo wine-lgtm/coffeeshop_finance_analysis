@@ -13,7 +13,10 @@
         /* Reset dashboard margin so content uses full width */
         #dashboard-section { margin-left: 0 !important; padding: 40px; }
         html, body {
-            overflow-y: hidden !important;
+            overflow-y: auto !important;
+        }
+            body::-webkit-scrollbar {
+            display: none;  /* Chrome, Safari, and Opera */
         }
     </style>
 
@@ -153,13 +156,14 @@ select:focus {
 label {
     letter-spacing: 0.4px;
 }
-
+ 
 /* ===== Titles ===== */
 h3 {
     margin-top: 10px;
     color: #2c3e50;
+    font-weight: bold;
 }
-
+ 
 h4 {
     color: #34495e;
 }
@@ -243,12 +247,18 @@ td button:hover {
             <header class="dash-header">
                 <h1>Category Budget Management</h1>
                 <button onclick="window.location.href='overall_budget.html'; event.stopPropagation();" 
-                style="background: #93BD57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+                style="background: #bdbb57; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
             Manage Overall Budget
+        </button>
+        <button onclick="window.location.href='payroll_budget.html'; event.stopPropagation();" 
+                style="background: #576dbd; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Payroll Budget
         </button>
                 <button onclick="window.location.href='budget_section.html'" style="background: #802E22; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
+            
+
             <div id="category-budget-section" class="manage-expense-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 id="form-title">Add New Budget</h3>
@@ -257,6 +267,43 @@ td button:hover {
                         <button onclick="loadBudgets()" style="background: #2ea44f; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">Filter</button>
                     </div>
                 </div>
+                <!-- KPIs -->
+                <div id="category-kpis" style="display:flex; gap:12px; margin-bottom:16px;">
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Overall Budget</div>
+                        <div id="kpi-overall" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">COGS</div>
+                        <div id="kpi-cogs" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Operating</div>
+                        <div id="kpi-operating" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Payroll</div>
+                        <div id="kpi-payroll" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    
+                </div>
+
+                <!-- Overrun panel: show when total of 3 main categories > overall budget -->
+                <div id="category-overrun-panel" style="display:none; margin-bottom:16px; padding:16px; background:#fff3cd; border:1px solid #ffc107; border-radius:12px;">
+                    <div style="font-weight:600; color:#856404; margin-bottom:8px;">
+                        <i class="fas fa-exclamation-triangle"></i> Category budgets exceed the overall budget for this month.
+                    </div>
+                    <div id="category-overrun-detail" style="font-size:13px; color:#856404; margin-bottom:12px;"></div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button id="btn-finalize-budgets" type="button" style="background:linear-gradient(135deg,#28a745,#34d058); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600;">
+                            <i class="fas fa-check-double"></i> Finalize (scale to fit)
+                        </button>
+                        <button id="btn-cancel-finalize" type="button" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+                <div id="category-finalize-result" style="display:none; margin-bottom:16px; padding:12px; background:#d4edda; border:1px solid #28a745; border-radius:10px; font-size:13px;"></div>
 
                 <div class="expense-table-input">
                     <input type="hidden" id="budget_id">
@@ -289,7 +336,53 @@ td button:hover {
                         </div>
                     </div>
                 </div>
-
+                                   <!-- 3-Month Insights for Category Budgets -->
+                    <div id="category-three-month-insights" style="margin-top:20px; background:#f8fafc; border-radius:10px; padding:14px; border:1px solid #e6eef6;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3 style="margin:6px 0 10px 0; color:#1f4e79;">Last 3 Months: Category Expense</h3>
+                            <button id="toggle-category-three-month" style="background:#eee; border:none; padding:6px 8px; border-radius:6px;">Hide</button>
+                        </div>
+                        <div id="category-three-month-block">
+                        <div style="overflow:auto">
+                            <table style="width:100%; border-collapse:collapse; min-width:480px;">
+                                <thead>
+                                    <tr style="background:#f1f5f9; color:#0b2b4a;">
+                                        <th style="padding:10px; text-align:left;">Month</th>
+                                        <th style="padding:10px; text-align:right;">COGS Expense</th>
+                                        <th style="padding:10px; text-align:right;">Operating Expense</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category-three-month-table-body"></tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td style="padding:10px; font-weight:700;">Averages</td>
+                                        <td id="category-three-month-cogs-expense-avg" style="padding:10px; text-align:right; font-weight:700;"></td>
+                                        <td id="category-three-month-oper-expense-avg" style="padding:10px; text-align:right; font-weight:700;"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div id="category-three-month-actions" style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <strong>COGS Avg:</strong> <span id="category-three-month-cogs-avg-value" style="margin-left:6px;">-</span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <strong>COGS Highest:</strong> <span id="category-three-month-cogs-highest" style="margin-left:6px;">-</span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <strong>Operating Avg:</strong> <span id="category-three-month-oper-avg-value" style="margin-left:6px;">-</span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <strong>Operating Highest:</strong> <span id="category-three-month-oper-highest" style="margin-left:6px;">-</span>
+                            </div>
+                            <div style="margin-left:auto; display:flex; gap:8px;">
+                                <button id="use-cat-average-btn" style="background:#3b82f6;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use Average</button>
+                                <button id="use-cat-highest-btn" style="background:#f97316;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use Highest</button>
+                                <button id="use-cat-avg-buffer-btn" style="background:#10b981;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use Avg +10% Buffer</button>
+                            </div>
+                        </div>
+                        </div>
+   </div>
                 <h3 style="margin-top: 30px;">Budget List</h3>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
@@ -333,7 +426,26 @@ td button:hover {
                         </table>
                     </div>
                 </div>
+
+
+                                    <!-- 3-Month Insights for Category Budgets -->
+                    
+                        </div>
+
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function(){
+                                const toggleBtn = document.getElementById('toggle-category-three-month');
+                                const block = document.getElementById('category-three-month-block');
+                                if (!toggleBtn || !block) return;
+                                toggleBtn.addEventListener('click', function(){
+                                    if (block.style.display === 'none') { block.style.display = ''; toggleBtn.innerText = 'Hide'; }
+                                    else { block.style.display = 'none'; toggleBtn.innerText = 'Show'; }
+                                });
+                            });
+                        </script>
+
             </div>
+            
         </div>
 
         <div id="report-page" class="page-section">
@@ -343,7 +455,7 @@ td button:hover {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js?v=4"></script>
-    <script src="budget.js?v=4"></script>
+    <script src="budget.js?v=5"></script>
     <script>
     // Add edit and delete actions for category budgets
     function renderCategoryBudgetTable(budgets, tableBodyId, category) {
@@ -431,6 +543,147 @@ td button:hover {
             if (typeof initBudgetForm === 'function') {
                 initBudgetForm();
             }
+        });
+    </script>
+    <script>
+        // KPIs and finalize logic
+        const API_BASE = 'http://127.0.0.1:8000';
+        async function updateCategoryKPIs() {
+            const filter = document.getElementById('budget_month_filter');
+            if (!filter || !filter.value) return;
+            const month = filter.value;
+            try {
+                const res = await fetch(`${API_BASE}/api/kpis?month=${month}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                document.getElementById('kpi-overall').innerText = data.overall && data.overall.budgeted ? `$ ${Number(data.overall.budgeted).toLocaleString()}` : '-';
+                document.getElementById('kpi-cogs').innerText = data.cogs && data.cogs.budgeted ? `$ ${Number(data.cogs.budgeted).toLocaleString()} (${data.cogs.percent_of_overall ?? '-' }%)` : '-';
+                document.getElementById('kpi-operating').innerText = data.operating && data.operating.budgeted ? `$ ${Number(data.operating.budgeted).toLocaleString()} (${data.operating.percent_of_overall ?? '-' }%)` : '-';
+                document.getElementById('kpi-payroll').innerText = data.payroll && data.payroll.budgeted ? `$ ${Number(data.payroll.budgeted).toLocaleString()} (${data.payroll.percent_of_overall ?? '-' }%)` : '-';
+
+                console.debug('[KPIs]', data);
+                // Use backend budget-summary for overrun (same logic as save validation)
+                const summaryRes = await fetch(`${API_BASE}/api/budget-summary?month=${encodeURIComponent(month)}`);
+                if (summaryRes.ok) {
+                    const summary = await summaryRes.json();
+                    showOrHideFinalizePanel(summary.overall, summary.main_sum, month, summary.overrun);
+                } else {
+                    showOrHideFinalizePanel(data.overall?.budgeted ? Number(data.overall.budgeted) : null, (data.cogs?.budgeted || 0) + (data.operating?.budgeted || 0) + (data.payroll?.budgeted || 0), month, false);
+                }
+            } catch (err) {
+                console.error('Error fetching KPIs', err);
+            }
+        }
+
+        function showOrHideFinalizePanel(overall, totalMain, month, overrun) {
+            const panel = document.getElementById('category-overrun-panel');
+            const resultEl = document.getElementById('category-finalize-result');
+            if (!panel) return;
+            const show = overrun === true || (overall != null && totalMain > overall);
+            if (show) {
+                const detail = document.getElementById('category-overrun-detail');
+                const excess = overall != null && totalMain > overall ? totalMain - overall : (totalMain - (overall || 0));
+                if (detail) detail.innerHTML = `Overall: $ ${Number(overall).toLocaleString()} &nbsp;|&nbsp; COGS + Operating + Payroll = $ ${Number(totalMain).toLocaleString()} (exceeds by $ ${Number(excess).toLocaleString()}). Click <strong>Finalize</strong> to scale all category budgets to fit.`;
+                panel.style.display = 'block';
+                if (resultEl) resultEl.style.display = 'none';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        /** Call this when save fails with "exceeds overall budget" so the Finalize panel is shown (e.g. from budget.js). */
+        function showCategoryOverrunPanel(detailMessage) {
+            const panel = document.getElementById('category-overrun-panel');
+            const resultEl = document.getElementById('category-finalize-result');
+            const detailEl = document.getElementById('category-overrun-detail');
+            if (!panel) return;
+            if (detailEl && detailMessage) detailEl.textContent = detailMessage;
+            panel.style.display = 'block';
+            if (resultEl) resultEl.style.display = 'none';
+        }
+
+        async function onFinalizeBudgets() {
+            const filter = document.getElementById('budget_month_filter');
+            if (!filter || !filter.value) return;
+            const month = filter.value;
+            const btn = document.getElementById('btn-finalize-budgets');
+            const resultEl = document.getElementById('category-finalize-result');
+            const panel = document.getElementById('category-overrun-panel');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finalizing...'; }
+            try {
+                // build URL including pendingBudget if it matches current month
+                let url = `${API_BASE}/api/finalize-budgets?month=${encodeURIComponent(month)}`;
+                if (typeof pendingBudget !== 'undefined' && pendingBudget && pendingBudget.month === month) {
+                    url += `&pending_category=${encodeURIComponent(pendingBudget.category)}`;
+                    url += `&pending_amount=${encodeURIComponent(pendingBudget.amount)}`;
+                }
+                const res = await fetch(url, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    alert(data.detail || 'Failed to finalize budgets.');
+                    return;
+                }
+                const factor = data.factor != null ? (Number(data.factor) * 100).toFixed(1) : '-';
+                let msg = `Scaling factor applied: ${factor}%. Budgets have been updated to fit the overall budget.`;
+                if (data.updates && data.updates.length) {
+                    const mainUpdates = data.updates.filter(u => u.category);
+                    if (mainUpdates.length) {
+                        msg += '<br><br><strong>Main categories:</strong> ';
+                        msg += mainUpdates.map(u => `${u.category} → $ ${Number(u.new).toLocaleString()}`).join('; ');
+                    }
+                }
+                if (data.payroll && data.payroll.new != null) {
+                    msg += `<br><strong>Payroll:</strong> $ ${Number(data.payroll.new).toLocaleString()}`;
+                }
+                if (resultEl) {
+                    resultEl.innerHTML = msg;
+                    resultEl.style.display = 'block';
+                }
+                if (panel) panel.style.display = 'none';
+                if (typeof loadBudgets === 'function') loadBudgets();
+                updateCategoryKPIs();
+                // if a pending budget existed, populate form with the scaled result and mark id
+                if (typeof pendingBudget !== 'undefined' && pendingBudget) {
+                    const m = pendingBudget.month;
+                    const matched = (data.updates || []).find(u => u.category === pendingBudget.category);
+                    if (matched) {
+                        const idField = document.getElementById('budget_id');
+                        const monthField = document.getElementById('budget_month');
+                        const catField = document.getElementById('budget_category');
+                        const amtField = document.getElementById('budget_amount');
+                        if (idField) idField.value = matched.id || '';
+                        if (monthField) monthField.value = m;
+                        if (catField) catField.value = pendingBudget.category;
+                        if (amtField) amtField.value = matched.new;
+                    }
+                }
+                // clear the pending record now that the server has acted on it
+                pendingBudget = null;
+            } catch (err) {
+                console.error('Finalize error', err);
+                alert('Error finalizing budgets. Please try again.');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> Finalize (scale to fit)'; }
+            }
+        }
+
+        function onCancelFinalize() {
+            const panel = document.getElementById('category-overrun-panel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+            // update KPIs at load and periodically
+            updateCategoryKPIs();
+            setInterval(updateCategoryKPIs, 30000);
+
+            const filter = document.getElementById('budget_month_filter');
+            if (filter) filter.addEventListener('change', updateCategoryKPIs);
+
+            const btnFinalize = document.getElementById('btn-finalize-budgets');
+            const btnCancel = document.getElementById('btn-cancel-finalize');
+            if (btnFinalize) btnFinalize.addEventListener('click', onFinalizeBudgets);
+            if (btnCancel) btnCancel.addEventListener('click', onCancelFinalize);
         });
     </script>
     <!-- Sidebar logic removed -->

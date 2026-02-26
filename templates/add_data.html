@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --bg: #f6efe7;
+            --bg: #fdfaf9;
             --text: #3f2f25;
             --muted: #7a6a5f;
             --card: #ffffff;
@@ -20,23 +20,26 @@
             --expense-text: #78350f;
             --income-bg: #a7f3d0;
             --income-text: #065f46;
+            --sidebar-bg: #2b1d1a;
+            --sidebar-text: #ffffff;
         }
         body {
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Poppins', system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
+            line-height: 1.5;
         }
         /* Sidebar Styles */
-        .sidebar { width: 70px; height: 100vh; background: #2b1d1a; position: fixed; left: 0; top: 0; transition: 0.3s; z-index: 1000; overflow: hidden; }
+        .sidebar { width: 70px; height: 100vh; background: var(--sidebar-bg); position: fixed; left: 0; top: 0; transition: all 0.3s; z-index: 1000; overflow: hidden; box-shadow: 4px 0 24px rgba(0,0,0,0.1); }
         .sidebar:hover { width: 240px; }
         .sidebar .user-profile { display: flex; align-items: center; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar .user-profile img { width: 40px; height: 40px; border-radius: 8px; margin-right: 15px; }
-        .sidebar .user-name { color: white; white-space: nowrap; opacity: 0; transition: 0.3s; }
+        .sidebar .user-name { color: var(--sidebar-text); white-space: nowrap; opacity: 0; transition: 0.3s; }
         .sidebar:hover .user-name { opacity: 1; }
         .sidebar ul { list-style: none; padding: 10px 0; margin: 0; }
         .sidebar ul li a { text-decoration: none; color: #a9abbf; display: flex; align-items: center; padding: 15px 25px; transition: 0.3s; }
-        .sidebar ul li a i { font-size: 20px; min-width: 30px; }
+        .sidebar ul li a i { font-size: 20px; min-width: 30px; display: flex; justify-content: center; }
         .sidebar .text { margin-left: 15px; opacity: 0; transition: 0.3s; white-space: nowrap; }
         .sidebar:hover .text { opacity: 1; }
         .sidebar ul li a:hover { background: #6f4e37; color: white; }
@@ -45,6 +48,7 @@
             margin-left: 70px;
             padding: 20px;
             transition: 0.3s;
+            max-width: 1200px;
         }
         .sidebar:hover ~ .main-content {
             margin-left: 240px;
@@ -59,6 +63,11 @@
             padding: 24px;
             box-shadow: 0 4px 6px var(--shadow);
             margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
         }
         .header {
             display: flex;
@@ -70,6 +79,7 @@
             margin: 0;
             font-size: 20px;
             color: var(--text);
+            font-weight: 700;
         }
         .date-display {
             color: var(--muted);
@@ -169,14 +179,47 @@
         /* Payroll Section Styles */
         .payroll-section {
             background: #fff;
-            padding: 20px;
+            padding: 24px;
             border-radius: 12px;
             margin-bottom: 24px;
-            border: 2px solid var(--brand);
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .tab-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #7b4f2b;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .tab-btn.active {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand);
+        }
+        .flash-container {
+            margin-bottom: 16px;
+        }
+        .flash-message {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
         }
     </style>
 </head>
-<body>
+  <body>
 
     <div id="sidebar-nav" class="sidebar">
         <div class="user-profile">
@@ -196,35 +239,139 @@
 
     <div class="main-content">
         <div class="container">
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for message in messages %}
+        <div class="flash-message">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="card" style="margin-bottom: 20px; border: none; box-shadow: none; background: transparent; padding: 0;">
+        <div class="header">
+            <h2 style="font-size: 24px; font-weight: 700; color: #2b1d1a;">Manage Cash Entry</h2>
+        </div>
+        <div class="tab-row" style="background: #fff; padding: 6px; border-radius: 12px; display: inline-flex; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <a href="{{ url_for('add_data', role=role, origin=origin, view='daily') }}" class="tab-btn {% if view != 'payroll' %}active{% endif %}" style="border: none; padding: 10px 24px; font-size: 15px;">Daily Records</a>
+            {% if role == 'admin' %}
+            <a href="{{ url_for('add_data', role=role, origin=origin, view='payroll') }}" class="tab-btn {% if view == 'payroll' %}active{% endif %}" style="border: none; padding: 10px 24px; font-size: 15px;">Payroll</a>
+            {% endif %}
+        </div>
+    </div>
     
-    <!-- Admin Payroll Section -->
-    {% if role == 'admin' %}
+    {% if role == 'admin' and view == 'payroll' %}
     <div class="card payroll-section">
         <div class="header">
             <h2><i class="fas fa-money-check-alt"></i> Employee Payroll Entry</h2>
         </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+            <button type="button" id="toggleEmployeeGrid" style="background:none; border:none; color:#8b5e34; font-size:13px; cursor:pointer; text-decoration:underline; padding:0;">
+                View employees
+            </button>
+        </div>
+
+        <div id="employeeGrid" style="display:none; margin-bottom: 24px;">
+            <form method="POST" action="{{ url_for('add_employee') }}" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+                <input type="hidden" name="role" value="{{ role }}">
+                <input type="hidden" name="origin" value="{{ origin }}">
+                <div style="flex: 1 1 160px;">
+                    <label>Employee name</label>
+                    <input type="text" name="employee_name" placeholder="New staff name">
+                </div>
+                <div style="flex: 1 1 140px;">
+                    <label>Role</label>
+                    <select name="employee_role">
+                        <option value="">Select role</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Barista">Barista</option>
+                        <option value="Cashier">Cashier</option>
+                        <option value="Waiter">Waiter</option>
+                    </select>
+                </div>
+                <div style="flex: 1 1 120px;">
+                    <label>Base pay ($)</label>
+                    <input type="number" name="base_pay" step="0.01" min="0">
+                </div>
+                <div style="flex: 0 0 auto;">
+                    <button type="submit" class="submit-btn" style="width:auto; padding:8px 16px;">Add employee</button>
+                </div>
+            </form>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+                {% for e in employees %}
+                <div class="employee-card" style="position: relative; background: #fff; border: 1px solid #e7d7c9; border-radius: 12px; padding: 12px; text-align: center; box-shadow: 0 2px 4px rgba(63,47,37,0.05);">
+                    <form method="POST" action="{{ url_for('delete_employee') }}" style="position:absolute; top:6px; right:6px;" onsubmit="return confirm('Remove this employee from the list because they quit or were fired?');">
+                        <input type="hidden" name="role" value="{{ role }}">
+                        <input type="hidden" name="origin" value="{{ origin }}">
+                        <input type="hidden" name="employee_id" value="{{ e.employee_id }}">
+                        <input type="hidden" name="employee_name" value="{{ e.employee_name }}">
+                        <button type="submit" style="background:none; border:none; color:#c0392b; cursor:pointer; font-size:10px;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </form>
+                    <div style="width: 44px; height: 44px; background: #f6efe7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; color: #8b5e34;">
+                        {% if e.role == 'Manager' %}
+                        <i class="fas fa-user-tie"></i>
+                        {% elif e.role == 'Barista' %}
+                        <i class="fas fa-mug-hot"></i>
+                        {% elif e.role == 'Cashier' %}
+                        <i class="fas fa-cash-register"></i>
+                        {% elif e.role == 'Waiter' %}
+                        <i class="fas fa-utensils"></i>
+                        {% else %}
+                        <i class="fas fa-user"></i>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 14px; font-weight: 600; color: #3f2f25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ e.employee_name }}</div>
+                    <div style="font-size: 12px; font-weight: 500; color: #5a4a3f;">{{ e.role }}</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #8b5e34; margin-top: 4px;">${{ "%.2f"|format(e.base_pay) }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <form method="POST">
             <input type="hidden" name="origin" value="{{ origin }}">
+            <input type="hidden" name="view" value="payroll">
             <input type="hidden" name="entry_type" value="expense">
             <input type="hidden" name="category" value="Payroll">
             <input type="hidden" name="staff_name" value="Admin">
-            
+            <input type="hidden" name="description" id="descriptionInput">
+            <input type="hidden" name="balance" id="netPayInput">
+
             <div>
-                <label>Employee Name</label>
-                <input type="text" name="description" placeholder="Employee Name" required>
+                <label>Select Role</label>
+                <select id="roleSelect" required>
+                    <option value="">Choose a role...</option>
+                </select>
+                <input type="hidden" name="employee_role" id="employeeRoleInput">
             </div>
             <div>
-                <label>Payroll Details</label>
-                <input type="text" name="details" placeholder="e.g. January Salary, Bonus">
+                <label>Select Employee</label>
+                <select name="employee_id" id="employeeSelect" required disabled>
+                    <option value="">Waiting for role...</option>
+                </select>
+                <input type="hidden" name="employee_name" id="employeeNameInput">
             </div>
             <div>
-                <label>Date</label>
+                <label>Base Pay ($)</label>
+                <input type="number" id="basePayDisplay" step="0.01" readonly>
+                <input type="hidden" name="base_pay" id="basePayInput">
+            </div>
+            <div>
+                <label>Bonus ($)</label>
+                <div style="position: relative;">
+                    <input type="number" name="bonus" id="bonusInput" step="0.01" min="0" value="0.00">
+                    <span id="bonusLimitText" style="position: absolute; right: 12px; top: 12px; color: #7a6a5f; font-size: 11px;"></span>
+                </div>
+            </div>
+            <div class="full-width">
+                <label>Payment Date</label>
                 <input type="date" name="date" value="{{ today }}">
             </div>
-            <div>
-                <label>Amount ($)</label>
-                <input type="number" name="balance" step="0.01" placeholder="0.00" required>
-            </div>
+            
             <div class="full-width">
                 <button type="submit" class="submit-btn">Record Payroll</button>
             </div>
@@ -232,7 +379,7 @@
     </div>
     {% endif %}
 
-    {% if role == 'admin' %}
+    {% if role == 'admin' and view != 'payroll' %}
     <div class="card">
         <div class="header">
             <h2><i class="fas fa-file-import"></i> Import Entries (CSV/Excel)</h2>
@@ -243,14 +390,17 @@
             <div class="full-width">
                 <button type="submit" class="submit-btn">Import</button>
             </div>
+        <input type="hidden" name="view" value="daily">
         </form>
     </div>
     {% endif %}
 
+    {% if view != 'payroll' %}
+    <!-- List Card -->
     <!-- Form Card -->
     <div class="card">
         <div class="header">
-            <h2>Cafe Record</h2>
+            <h2>Daily Records</h2>
             <span class="date-display">Today: {{ today }}</span>
         </div>
         <form method="POST">
@@ -263,6 +413,8 @@
                 <select name="entry_type" id="typeSelect">
                     <option value="expense" selected>Expense</option>
                     <option value="income">Income</option>
+
+                    <option value="equity">Owner's Equity (Personal)</option>
                 </select>
             </div>
             <div>
@@ -286,7 +438,12 @@
             {% if role == 'sale' %}
             <div>
                 <label>Staff name</label>
-                <input type="text" name="staff_name" placeholder="Who is recording this?" required>
+                <select name="staff_name" required>
+                    <option value="">Choose staff...</option>
+                    {% for e in employees %}
+                    <option value="{{ e.employee_name }}">{{ e.employee_name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             {% else %}
             <!-- Hidden for Admin -->
@@ -342,7 +499,6 @@
                 <button type="submit" class="submit-btn" style="width:auto; padding:8px 12px;">Filter</button>
             </div>
         </form>
-
         <table>
             <thead>
                 <tr>
@@ -388,10 +544,90 @@
             </tbody>
         </table>
     </div>
+    {% endif %}
+
+    {% if role == 'admin' and view == 'payroll' %}
+    <div class="card">
+        <div class="controls-row">
+            <h2>Payroll History</h2>
+        </div>
+        <form method="GET" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="role" value="{{ role }}">
+            <input type="hidden" name="origin" value="{{ origin }}">
+            <input type="hidden" name="view" value="payroll">
+            <div>
+                <label style="display:inline; margin-right:5px;">Month</label>
+                <select name="month" style="width: 120px;">
+                    <option value="" {{ not selected_month and 'selected' or '' }}>All</option>
+                    <option value="1"  {{ selected_month == 1 and 'selected' or '' }}>Jan</option>
+                    <option value="2"  {{ selected_month == 2 and 'selected' or '' }}>Feb</option>
+                    <option value="3"  {{ selected_month == 3 and 'selected' or '' }}>Mar</option>
+                    <option value="4"  {{ selected_month == 4 and 'selected' or '' }}>Apr</option>
+                    <option value="5"  {{ selected_month == 5 and 'selected' or '' }}>May</option>
+                    <option value="6"  {{ selected_month == 6 and 'selected' or '' }}>Jun</option>
+                    <option value="7"  {{ selected_month == 7 and 'selected' or '' }}>Jul</option>
+                    <option value="8"  {{ selected_month == 8 and 'selected' or '' }}>Aug</option>
+                    <option value="9"  {{ selected_month == 9 and 'selected' or '' }}>Sep</option>
+                    <option value="10" {{ selected_month == 10 and 'selected' or '' }}>Oct</option>
+                    <option value="11" {{ selected_month == 11 and 'selected' or '' }}>Nov</option>
+                    <option value="12" {{ selected_month == 12 and 'selected' or '' }}>Dec</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:inline; margin-right:5px;">Year</label>
+                <select name="year" style="width: 120px;">
+                    <option value="" {{ not selected_year and 'selected' or '' }}>All</option>
+                    {% for y in available_years %}
+                    <option value="{{ y }}" {{ selected_year == y and 'selected' or '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-left: auto;">
+                <button type="submit" class="submit-btn" style="width:auto; padding:8px 12px;">Filter</button>
+            </div>
+        </form>
+        <table>
+            <thead>
+                <tr>
+                    <th>Employee Name</th>
+                    <th>Role</th>
+                    <th>Pay Date</th>
+                    <th class="amount-col">Net Pay ($)</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payroll_rows %}
+                <tr>
+                    <td>{{ p.employee_name }}</td>
+                    <td>{{ p.role or '-' }}</td>
+                    <td>{{ p.pay_date }}</td>
+                    <td class="amount-col">{{ "%.2f"|format(p.net_pay or 0) }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_entry', id=p.employee_id, role=role, origin=origin) }}" onsubmit="return confirm('Are you sure you want to delete this payroll entry?');">
+                            <input type="hidden" name="date" value="{{ p.pay_date }}">
+                            <input type="hidden" name="employee_name" value="{{ p.employee_name }}">
+                            <input type="hidden" name="net_pay" value="{{ p.net_pay }}">
+                            <input type="hidden" name="is_payroll" value="true">
+                            <button type="submit" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align:center; padding: 20px;">No payroll records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 </div>
 
 <script type="application/json" id="categories-data">
     {{ categories_map | tojson | default({}, true) }}
+</script>
+
+<script type="application/json" id="employees-data">
+    {{ employees | tojson | default([], true) }}
 </script>
 
 <script>
@@ -403,7 +639,15 @@
     const detailsList = document.getElementById('detailsList');
     const balanceInput = document.getElementById('balanceInput');
     
-    const categoriesMap = JSON.parse(document.getElementById('categories-data').textContent);
+    let categoriesMap = {};
+    const catDataEl = document.getElementById('categories-data');
+    if (catDataEl) {
+        try {
+            categoriesMap = JSON.parse(catDataEl.textContent);
+        } catch(e) {
+            console.error("Failed to parse categories data", e);
+        }
+    }
 
 
     // Description mapping constrained by subcategory selection
@@ -421,18 +665,29 @@
         'Equipment purchase': ['Grinder','Machine','Oven'],
         'Taxes / licenses / bank fees': ['Taxes','Licenses','Bank Fees'],
         'Staff meal': ['Staff meal'],
-        'Miscellaneous': ['Misc']
+        'Miscellaneous': ['Misc'],
+        'Owner Investment': ['Personal Savings','Initial Capital','Emergency Injection'],
+        'Owner Draw-out': ['Personal Salary','Owner Dividends','Personal Expense Reimbursement']
     };
 
     const allowedDescriptionsByCategory = {
         'Sales Revenue': ['Daily Sales Deposit','Coffee Sales','Bakery Sales'],
         'COGS': ['Bakery Payment','Coffee Supplier Payment','Supplies','Ingredients / Groceries','Packaging'],
-        'Operating Expense': ['Utilities','Utility Bill Payment','Marketing','Marketing / promotion','Taxes / licenses / bank fees','Rent Payment','Miscellaneous','Staff meal','Equipment purchase','Local Print Shop','Facebook Ads','Utility Company']
+        'Operating Expense': ['Utilities','Utility Bill Payment','Marketing','Marketing / promotion','Taxes / licenses / bank fees','Rent Payment','Miscellaneous','Staff meal','Equipment purchase','Local Print Shop','Facebook Ads','Utility Company'],
+        'Owner Equity': ['Owner Investment','Owner Draw-out']
     };
 
     function updateCategories() {
+        if (!typeSelect || !categorySelect) return;
         const type = typeSelect.value;
-        const allowed = type === 'income' ? ['Sales Revenue'] : ['COGS','Operating Expense'];
+        let allowed;
+        if (type === 'income') {
+            allowed = ['Sales Revenue'];
+        } else if (type === 'equity') {
+            allowed = ['Owner Equity'];
+        } else {
+            allowed = ['COGS','Operating Expense'];
+        }
         const existing = Object.keys(categoriesMap).filter(c => allowed.includes(c));
         const categories = existing.length ? existing : allowed;
         categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -440,6 +695,7 @@
     }
 
     function updateDescriptionsForCategory() {
+        if (!categorySelect || !descSelect) return;
         const cat = categorySelect.value;
         const rawDescs = categoriesMap[cat] || [];
         const allowedDescs = allowedDescriptionsByCategory[cat] || rawDescs;
@@ -451,12 +707,14 @@
         updateDetails();
     }
 
-    typeSelect.addEventListener('change', updateCategories);
-    categorySelect.addEventListener('change', updateDescriptionsForCategory);
-    descSelect.addEventListener('change', updateDetails);
+    if (typeSelect) typeSelect.addEventListener('change', updateCategories);
+    if (categorySelect) categorySelect.addEventListener('change', updateDescriptionsForCategory);
+    if (descSelect) descSelect.addEventListener('change', updateDetails);
 
     // Initialize
-    updateCategories();
+    if (typeSelect && categorySelect) {
+        updateCategories();
+    }
 
     function performLogout() {
         localStorage.removeItem('coffee_user_role');
@@ -464,9 +722,146 @@
     }
 
     function updateDetails() {
+        if (!descSelect || !detailsList) return;
         const desc = descSelect.value;
         const opts = detailsByDescription[desc] || [];
         detailsList.innerHTML = opts.map(o => `<option value="${o}">`).join('');
+    }
+
+    const employeeSelect = document.getElementById('employeeSelect');
+    const roleSelect = document.getElementById('roleSelect');
+    const basePayDisplay = document.getElementById('basePayDisplay');
+    const basePayInput = document.getElementById('basePayInput');
+    const bonusInput = document.getElementById('bonusInput');
+    const bonusLimitText = document.getElementById('bonusLimitText');
+    const netPayInput = document.getElementById('netPayInput');
+    const employeeNameInput = document.getElementById('employeeNameInput');
+    const employeeRoleInput = document.getElementById('employeeRoleInput');
+    const descriptionInput = document.getElementById('descriptionInput');
+    const employeeGrid = document.getElementById('employeeGrid');
+    const toggleEmployeeGridBtn = document.getElementById('toggleEmployeeGrid');
+
+    if (toggleEmployeeGridBtn && employeeGrid) {
+        toggleEmployeeGridBtn.addEventListener('click', function() {
+            const isHidden = employeeGrid.style.display === 'none' || employeeGrid.style.display === '';
+            employeeGrid.style.display = isHidden ? 'block' : 'none';
+            this.textContent = isHidden ? 'Hide employees' : 'View employees';
+        });
+    }
+
+    let employeesData = [];
+    try {
+        employeesData = JSON.parse(document.getElementById('employees-data').textContent);
+    } catch(e) {
+        console.error("Failed to parse employees data", e);
+    }
+
+    // Populate Role Select
+    if (roleSelect) {
+        // Updated roles list to match user request and DB
+        const roles = ["Manager", "Barista", "Cashier", "Waiter"];
+        roles.forEach(role => {
+            const opt = document.createElement('option');
+            opt.value = role;
+            opt.textContent = role;
+            roleSelect.appendChild(opt);
+        });
+    }
+
+    // Handle Role Change
+    if (roleSelect) {
+        roleSelect.addEventListener('change', function() {
+            const selectedRole = this.value;
+            
+            // Clear Employee Select
+            employeeSelect.innerHTML = '<option value="">Select Employee</option>';
+            employeeSelect.disabled = !selectedRole;
+            
+            // Clear Fields
+            clearEmployeeFields();
+
+            if (selectedRole) {
+                const filteredEmployees = employeesData.filter(e => e.role === selectedRole);
+                filteredEmployees.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.employee_id;
+                    opt.textContent = `${e.employee_name}`;
+                    // Store data attributes for easy access
+                    opt.setAttribute('data-name', e.employee_name);
+                    opt.setAttribute('data-role', e.role);
+                    opt.setAttribute('data-base-pay', e.base_pay);
+                    employeeSelect.appendChild(opt);
+                });
+                
+                // Auto-select the first employee if available
+                if (filteredEmployees.length > 0) {
+                    employeeSelect.selectedIndex = 1; // Index 0 is "Select Employee", so 1 is the first real option
+                    updateEmployeeFields();
+                }
+            }
+            if (employeeRoleInput) employeeRoleInput.value = selectedRole;
+        });
+    }
+
+    function clearEmployeeFields() {
+        if (basePayDisplay) basePayDisplay.value = "";
+        if (basePayInput) basePayInput.value = "";
+        if (employeeNameInput) employeeNameInput.value = "";
+        if (employeeRoleInput) employeeRoleInput.value = "";
+        if (descriptionInput) descriptionInput.value = "";
+        if (bonusInput) bonusInput.value = "0.00";
+        if (netPayInput) netPayInput.value = "0.00";
+    }
+
+    function updateEmployeeFields() {
+        if (!employeeSelect) return;
+        const opt = employeeSelect.options[employeeSelect.selectedIndex];
+        if (!opt || !opt.value) {
+            clearEmployeeFields();
+            return;
+        }
+        const name = opt.getAttribute('data-name') || '';
+        const role = opt.getAttribute('data-role') || '';
+        const base = parseFloat(opt.getAttribute('data-base-pay') || '0') || 0;
+        
+        if (basePayDisplay) basePayDisplay.value = base.toFixed(2);
+        if (basePayInput) basePayInput.value = base.toFixed(2);
+        if (employeeNameInput) employeeNameInput.value = name;
+        if (employeeRoleInput) employeeRoleInput.value = role;
+        if (descriptionInput) descriptionInput.value = name;
+        updateNetPay();
+    }
+
+    function updateNetPay() {
+        if (!basePayInput || !netPayInput) return;
+        const base = parseFloat(basePayInput.value || '0') || 0;
+        let bonus = 0;
+        
+        // Realistic bonus limit: 15% of base pay
+        const maxBonus = base * 0.15;
+        
+        if (bonusLimitText) {
+            bonusLimitText.textContent = `Max: $${maxBonus.toFixed(2)}`;
+        }
+        
+        if (bonusInput) {
+            bonus = parseFloat(bonusInput.value || '0') || 0;
+            if (bonus < 0) bonus = 0;
+            if (bonus > maxBonus) {
+                bonus = maxBonus;
+                bonusInput.value = bonus.toFixed(2);
+            }
+        }
+        const net = base + bonus;
+        netPayInput.value = net.toFixed(2);
+    }
+
+    if (employeeSelect) {
+        employeeSelect.addEventListener('change', updateEmployeeFields);
+        updateEmployeeFields();
+    }
+    if (bonusInput) {
+        bonusInput.addEventListener('input', updateNetPay);
     }
 </script>
 

@@ -147,6 +147,15 @@ table {
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
 }
 
+/* Numeric amount cells: align right and fix column width for consistency */
+.amount-cell {
+    text-align: right;
+    font-weight: 600;
+    padding-right: 12px;
+    width: 220px; /* reserve space so header aligns with values */
+    white-space: nowrap;
+}
+
 thead {
     background: linear-gradient(100deg, #802E22, #883e32);
     color: white;
@@ -183,6 +192,9 @@ td button {
     cursor: pointer;
     font-size: 12px;
 }
+tfoot {
+    display: none;
+}
 
 /* ===== Titles ===== */
 h3 {
@@ -214,6 +226,11 @@ h3 {
             Manage Category Budget
         </button>
 
+        <button onclick="window.location.href='payroll_budget.html'; event.stopPropagation();" 
+                style="background: #577cbd; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; align-self: center;">
+            Manage Payroll Budget
+        </button>
+
                  <button onclick="window.location.href='budget_section.html'" style="background: #802E22; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;"><i class="fas fa-arrow-left"></i> Back to Budget Dashboard</button>
             </header>
             
@@ -225,6 +242,26 @@ h3 {
                         <button onclick="loadOverallBudgets()" style="background: #2ea44f; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">Filter</button>
                     </div>
                 </div>
+                <!-- KPIs -->
+                <div id="overall-kpis" style="display:flex; gap:12px; margin-bottom:16px;">
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Overall Budget</div>
+                        <div id="kpi-overall" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">COGS</div>
+                        <div id="kpi-cogs" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Operating</div>
+                        <div id="kpi-operating" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div class="kpi" style="flex:1; background:#fdf8f0; padding:10px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:#666;">Payroll</div>
+                        <div id="kpi-payroll" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                </div>
+                
 
                 <div class="expense-table-input">
                     <input type="hidden" id="overall_budget_id">
@@ -237,6 +274,7 @@ h3 {
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">AMOUNT</label>
                             <input type="number" id="overall_budget_amount" placeholder="0.00">
+                            
                         </div>
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #666; display: block; margin-bottom: 5px;">DESCRIPTION</label>
@@ -248,6 +286,61 @@ h3 {
                         </div>
                     </div>
                 </div>
+                </div>
+
+                <!--    3 Months -->
+
+                        
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:6px 0 10px 0; color:#1f4e79;">Last 3 Months: Budget vs Expense</h3>
+                        <button id="toggle-overall-three-month" style="background:#eee; border:none; padding:6px 8px; border-radius:6px;">Hide</button>
+                    </div>
+                    <div id="overall-three-month-block">
+                        <div style="overflow:auto">
+                            <table style="width:100%; border-collapse:collapse; min-width:480px;">
+                            <thead>
+                                <tr style="background:#f1f5f9; color:#0b2b4a;">
+                                    <th style="padding:10px; text-align:left;">Month</th>
+                                    <th class="amount-cell" style="padding:10px; text-align:right;">Total Expense</th>
+                                </tr>
+                            </thead>
+                            <tbody id="overall-three-month-table-body"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td style="padding:10px; font-weight:700;"></td>
+                                    <td id="overall-three-month-average" style="padding:10px; text-align:right; font-weight:700;"></td>
+                                    <td id="overall-three-month-recommendation" style="padding:10px; text-align:right; font-weight:700;"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div id="overall-three-month-note" style="margin-top:8px; color:#334155; font-size:0.95rem;"></div>
+                    <div id="overall-three-month-actions" style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                     <div style="margin-bottom:8px;">
+    <strong>Avg Expense:</strong> 
+    <span id="overall-three-month-avg-value" style="margin-left:6px;">-</span>
+</div>
+
+<div style="margin-bottom:8px;">
+    <strong>Most Expensive Month:</strong> 
+    <span id="overall-three-month-highest" style="margin-left:6px;">-</span>
+</div>
+
+<div style="margin-bottom:8px;">
+    <strong>Starting Balance:</strong> 
+    <span id="overall_starting_balance_form" style="margin-left:6px;">-</span>
+</div>
+                        <div style="margin-left:auto; display:flex; gap:8px;">
+                            <button id="use-average-btn" style="background:#3b82f6;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use Average</button>
+                            <button id="use-highest-btn" style="background:#f97316;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use Highest</button>
+                            <button id="use-avg-buffer-btn" style="background:#10b981;color:white;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;">Use +10% Buffer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+
+
 
                 <h3 style="margin-top: 30px;">Monthly Overall Budget List</h3>
                 
@@ -259,11 +352,28 @@ h3 {
                             <th>Description</th>
                             <th>Actions</th>
                         </tr>
-                    </thead>
+                            <div id="overall-three-month-actions" style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <tbody id="overall-budget-table-body">
                         <!-- Budget rows will be populated here -->
                     </tbody>
                 </table>
+            
+                <!-- LAST 3 MONTHS INSIGHTS (added) -->
+                        </div>
+                        </div>
+                    </div>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function(){
+                                const toggleBtn = document.getElementById('toggle-overall-three-month');
+                                const block = document.getElementById('overall-three-month-block');
+                                if (!toggleBtn || !block) return;
+                                toggleBtn.addEventListener('click', function(){
+                                    if (block.style.display === 'none') { block.style.display = ''; toggleBtn.innerText = 'Hide'; }
+                                    else { block.style.display = 'none'; toggleBtn.innerText = 'Show'; }
+                                });
+                            });
+                        </script>
+                   
             </div>
         </div>
 
@@ -271,7 +381,9 @@ h3 {
             <div class="report-container" id="report-content-area">
                 </div>
         </div>
+        
     </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="newscript.js?v=4"></script>
     <script>
@@ -305,6 +417,163 @@ h3 {
     </script>
 
             <script src="overall_budget.js?v=4"></script>
+        <script>
+            // API base used by budget pages
+            const API_BASE = 'http://127.0.0.1:8000';
+
+            // small helper to convert YYYY-MM to start/end
+            function _monthStartEndLocal(monthStr) {
+                const [y, m] = monthStr.split('-').map(v => parseInt(v, 10));
+                const month = `${String(y)}-${String(m).padStart(2, '0')}`;
+                const start = `${month}-01`;
+                const lastDay = new Date(y, m, 0).getDate();
+                const end = `${month}-${String(lastDay).padStart(2, '0')}`;
+                return { month, start, end };
+            }
+
+            async function updateKPIsForOverall() {
+                const filter = document.getElementById('overall_month_filter');
+                if (!filter || !filter.value) return;
+                const month = filter.value;
+                try {
+                    const res = await fetch(`${API_BASE}/api/kpis?month=${month}`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    document.getElementById('kpi-overall').innerText = data.overall && data.overall.budgeted ? `$ ${Number(data.overall.budgeted).toLocaleString()}` : '-';
+                    document.getElementById('kpi-cogs').innerText = data.cogs && data.cogs.budgeted ? `$ ${Number(data.cogs.budgeted).toLocaleString()} (${data.cogs.percent_of_overall ?? '-' }%)` : '-';
+                    document.getElementById('kpi-operating').innerText = data.operating && data.operating.budgeted ? `$ ${Number(data.operating.budgeted).toLocaleString()} (${data.operating.percent_of_overall ?? '-' }%)` : '-';
+                    document.getElementById('kpi-payroll').innerText = data.payroll && data.payroll.budgeted ? `$ ${Number(data.payroll.budgeted).toLocaleString()} (${data.payroll.percent_of_overall ?? '-' }%)` : '-';
+                } catch (err) { console.error('Error fetching KPIs', err); }
+            }
+
+            async function updateOverallThreeMonthInsights() {
+                const tbody = document.getElementById('overall-three-month-table-body');
+                const avgEl = document.getElementById('overall-three-month-average');
+                const recEl = document.getElementById('overall-three-month-recommendation');
+                const noteEl = document.getElementById('overall-three-month-note');
+                if (!tbody || !avgEl || !recEl) return;
+
+                try {
+                    const filterInput = document.getElementById('overall_month_filter');
+                    const base = (filterInput && filterInput.value) ? new Date(filterInput.value + '-01') : new Date();
+
+                    const months = [];
+                    // produce the 3 months immediately BEFORE the base month
+                    for (let i = 3; i >= 1; i--) {
+                        const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+                        const ms = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        months.push(ms);
+                    }
+
+                    tbody.innerHTML = '';
+                    const results = [];
+
+                    for (const m of months) {
+                        let budgeted = 0;
+                        try {
+                            const bRes = await fetch(`${API_BASE}/api/overall_budgets?month=${m}`);
+                            if (bRes.ok) {
+                                const bs = await bRes.json();
+                                budgeted = (bs || []).reduce((s, b) => s + Number(b.amount || 0), 0);
+                            }
+                        } catch (e) { console.error('budget fetch failed for', m, e); }
+
+                        let totalExpense = 0;
+                        try {
+                            const { start, end } = _monthStartEndLocal(m);
+                            const fRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
+                            if (fRes.ok) {
+                                const data = await fRes.json();
+                                const breakdown = data.breakdown || {};
+                                const cogs = Number(breakdown.cogs || 0);
+                                const operating = Number(breakdown.operating || 0);
+                                const payroll = Number(breakdown.payroll || 0);
+                                totalExpense = Math.round((cogs + operating + payroll) * 100) / 100;
+                            }
+                        } catch (e) { console.error('financial-summary fetch failed for', m, e); }
+
+                        results.push({ month: m, budgeted: Math.round(budgeted * 100) / 100, expense: totalExpense });
+                    }
+
+                    results.forEach(r => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="padding:10px">${r.month}</td>
+                            <td class="amount-cell"><span class="currency">$</span><span class="value">${r.expense.toLocaleString()}</span></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    const avgActual = results.reduce((s, x) => s + x.expense, 0) / results.length;
+                    const recommended = Math.round(avgActual * 1.05);
+
+                    avgEl.innerText = `$ ${Math.round(avgActual).toLocaleString()}`;
+                    recEl.innerText = `$ ${recommended.toLocaleString()}`;
+                    if (noteEl) noteEl.innerText = ``;
+
+                    // additional outputs: avg numeric, highest month, starting balance and button wiring
+                    const avgValueEl = document.getElementById('overall-three-month-avg-value');
+                    const highestEl = document.getElementById('overall-three-month-highest');
+                    const startingBalEl = document.getElementById('overall-starting-balance');
+
+                    const mostExp = results.reduce((best, cur) => (cur.expense > (best.expense || 0) ? cur : best), {});
+                    if (avgValueEl) avgValueEl.innerText = `$ ${Number((Math.round(avgActual*100)/100)).toFixed(2)}`;
+                    if (highestEl) highestEl.innerText = `${mostExp.month || '-'} ($ ${Number((mostExp.expense||0)).toLocaleString()})`;
+
+                    // fetch starting balance for the oldest month in the 3-month window
+                    if (results.length > 0) {
+                        const oldest = results[0];
+                        try {
+                            const { start, end } = _monthStartEndLocal(oldest.month);
+                            const sbRes = await fetch(`${API_BASE}/api/financial-summary?start_date=${start}&end_date=${end}`);
+                            if (sbRes.ok) {
+                                const sbData = await sbRes.json();
+                                const sb = (sbData.summary && sbData.summary.starting_balance) ? Number(sbData.summary.starting_balance) : null;
+                                if (startingBalEl) startingBalEl.innerText = sb !== null ? `$ ${sb.toLocaleString()}` : '-';
+                            } else {
+                                if (startingBalEl) startingBalEl.innerText = '-';
+                            }
+                        } catch (e) {
+                            if (startingBalEl) startingBalEl.innerText = '-';
+                        }
+                    }
+
+                    // wire buttons to populate the amount input
+                    const useAvgBtn = document.getElementById('use-average-btn');
+                    const useHighBtn = document.getElementById('use-highest-btn');
+                    const useAvgBufBtn = document.getElementById('use-avg-buffer-btn');
+                    const amountInput = document.getElementById('overall_budget_amount');
+                    if (useAvgBtn) useAvgBtn.onclick = () => { if (amountInput) amountInput.value = (Math.round(avgActual*100)/100).toFixed(2); };
+                    if (useHighBtn) useHighBtn.onclick = () => { if (amountInput) amountInput.value = (Math.round((mostExp.expense||0)*100)/100).toFixed(2); };
+                    // Buffer: add 10% to whatever numeric value is currently shown in the amount input.
+                    if (useAvgBufBtn) useAvgBufBtn.onclick = () => {
+                        if (!amountInput) return;
+                        let cur = parseFloat(amountInput.value);
+                        if (isNaN(cur)) cur = (Math.round(avgActual*100)/100) || 0;
+                        const v = Math.round((cur * 1.10) * 100) / 100;
+                        amountInput.value = v.toFixed(2);
+                    };
+
+                } catch (err) {
+                    console.error('Failed to compute overall 3-month insights:', err);
+                    tbody.innerHTML = `<tr><td colspan="3" style="padding:12px; color:#c6302c;">Failed to load 3-month insights</td></tr>`;
+                    if (avgEl) avgEl.innerText = '-';
+                    if (recEl) recEl.innerText = '-';
+                    if (noteEl) noteEl.innerText = '';
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                // run once and when filter changes
+                updateOverallThreeMonthInsights();
+                updateKPIsForOverall();
+                const filter = document.getElementById('overall_month_filter');
+                if (filter) filter.addEventListener('change', updateOverallThreeMonthInsights);
+                if (filter) filter.addEventListener('change', updateKPIsForOverall);
+                setInterval(updateOverallThreeMonthInsights, 60000);
+                setInterval(updateKPIsForOverall, 30000);
+            });
+        </script>
     <script>
         // Inline: sync filter and table when form month changes (works even if overall_budget.js is cached on localhost)
         document.addEventListener('DOMContentLoaded', function() {
@@ -316,6 +585,8 @@ h3 {
                 if (!month) return;
                 filterInput.value = month;
                 if (typeof loadOverallBudgets === 'function') loadOverallBudgets();
+                if (typeof updateOverallThreeMonthInsights === 'function') updateOverallThreeMonthInsights();
+                if (typeof updateKPIsForOverall === 'function') updateKPIsForOverall();
             });
         });
     </script>

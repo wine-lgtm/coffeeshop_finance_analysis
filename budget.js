@@ -22,6 +22,10 @@ const allowedSubcategoriesByCategory = {
     ]
 };
 
+// pendingBudget holds an unsaved main-category entry that triggered an overrun error.
+// finalize operation will include its amount when scaling so the new row gets created.
+let pendingBudget = null;
+
 // Limit months: current month through next 3 months (no past months)
 function getAllowedMonthRange() {
     const now = new Date();
@@ -156,10 +160,156 @@ async function loadBudgets() {
         // Update summaries
         updateBudgetSummary(cogsBudgets, 'cogs-total');
         updateBudgetSummary(operatingBudgets, 'operating-total');
+        // Also refresh the 3-month category insights so they reflect the selected month
+        if (typeof updateCategoryThreeMonthInsights === 'function') updateCategoryThreeMonthInsights();
+        // Refresh KPIs and overrun panel when on category budget page
+        if (typeof updateCategoryKPIs === 'function') updateCategoryKPIs();
     } catch (error) {
         console.error('Error loading budgets:', error);
     }
 }
+
+// Compute and render 3-month insights for category budgets (COGS and Operating expense)
+async function updateCategoryThreeMonthInsights() {
+    // prevent concurrent executions which can cause duplicate rows when called
+    // from multiple places (DOMContentLoaded + loadBudgets)
+    if (updateCategoryThreeMonthInsights._running) return;
+    updateCategoryThreeMonthInsights._running = true;
+    const tbody = document.getElementById('category-three-month-table-body');
+    const cogsAvgEl = document.getElementById('category-three-month-cogs-avg-value');
+    const cogsHighEl = document.getElementById('category-three-month-cogs-highest');
+    const operAvgEl = document.getElementById('category-three-month-oper-avg-value');
+    const operHighEl = document.getElementById('category-three-month-oper-highest');
+    const filterInput = document.getElementById('budget_month_filter');
+    if (!tbody || !filterInput) return;
+
+    const base = filterInput.value ? new Date(filterInput.value + '-01') : new Date();
+    const months = [];
+    // Use the three months immediately BEFORE the selected month (e.g. April -> Jan, Feb, Mar)
+    for (let i = 3; i >= 1; i--) {
+        const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`);
+    }
+
+    tbody.innerHTML = '';
+    const results = [];
+
+    for (const m of months) {
+        let cogsBudget = 0;
+        let operBudget = 0;
+        try {
+            const bRes = await fetch(`http://127.0.0.1:8000/api/budgets?month=${m}`);
+            if (bRes.ok) {
+                const bs = await bRes.json();
+                cogsBudget = (bs || []).filter(b => b.category === 'COGS').reduce((s,x)=>s+Number(x.amount||0),0);
+                operBudget = (bs || []).filter(b => b.category === 'Operating expense').reduce((s,x)=>s+Number(x.amount||0),0);
+            }
+        } catch (e) { console.error('budget fetch failed for', m, e); }
+
+        let cogsExpense = 0;
+        let operExpense = 0;
+        try {
+            const [y, mm] = m.split('-').map(v=>parseInt(v,10));
+            const last = new Date(y, mm, 0).getDate();
+            const start = `${m}-01`;
+            const end = `${m}-${String(last).padStart(2,'0')}`;
+            const fRes = await fetch(`http://127.0.0.1:8000/api/financial-summary?start_date=${start}&end_date=${end}`);
+            if (fRes.ok) {
+                const data = await fRes.json();
+                const breakdown = data.breakdown || {};
+                cogsExpense = Number(breakdown.cogs || 0);
+                operExpense = Number(breakdown.operating || 0);
+            }
+        } catch (e) { console.error('financial-summary fetch failed for', m, e); }
+
+        results.push({ month: m, cogsBudget: Math.round(cogsBudget*100)/100, cogsExpense: Math.round(cogsExpense*100)/100, operBudget: Math.round(operBudget*100)/100, operExpense: Math.round(operExpense*100)/100 });
+    }
+
+    // render rows (only show expenses)
+    results.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="padding:10px">${r.month}</td>
+            <td class="amount-cell" style="text-align:right">$ ${r.cogsExpense.toLocaleString()}</td>
+            <td class="amount-cell" style="text-align:right">$ ${r.operExpense.toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // release running flag
+    updateCategoryThreeMonthInsights._running = false;
+
+    // averages
+    const avgCogsBudget = results.reduce((s,x)=>s+x.cogsBudget,0)/results.length;
+    const avgCogsExpense = results.reduce((s,x)=>s+x.cogsExpense,0)/results.length;
+    const avgOperBudget = results.reduce((s,x)=>s+x.operBudget,0)/results.length;
+    const avgOperExpense = results.reduce((s,x)=>s+x.operExpense,0)/results.length;
+
+    const cogsMost = results.reduce((best, cur) => (cur.cogsExpense > (best.cogsExpense||0) ? cur : best), {});
+    const operMost = results.reduce((best, cur) => (cur.operExpense > (best.operExpense||0) ? cur : best), {});
+
+    const elCogsExpenseAvg = document.getElementById('category-three-month-cogs-expense-avg');
+    const elOperExpenseAvg = document.getElementById('category-three-month-oper-expense-avg');
+
+    if (elCogsExpenseAvg) elCogsExpenseAvg.innerText = `$ ${Math.round(avgCogsExpense).toLocaleString()}`;
+    if (elOperExpenseAvg) elOperExpenseAvg.innerText = `$ ${Math.round(avgOperExpense).toLocaleString()}`;
+
+    if (cogsAvgEl) cogsAvgEl.innerText = `$ ${Number((Math.round(avgCogsExpense*100)/100)).toFixed(2)}`;
+    if (operAvgEl) operAvgEl.innerText = `$ ${Number((Math.round(avgOperExpense*100)/100)).toFixed(2)}`;
+    if (cogsHighEl) cogsHighEl.innerText = `${cogsMost.month || '-'} ($ ${Number((cogsMost.cogsExpense||0)).toLocaleString()})`;
+    if (operHighEl) operHighEl.innerText = `${operMost.month || '-'} ($ ${Number((operMost.operExpense||0)).toLocaleString()})`;
+
+    // wire buttons to populate the amount input based on selected main category
+    const useAvgBtn = document.getElementById('use-cat-average-btn');
+    const useHighBtn = document.getElementById('use-cat-highest-btn');
+    const useAvgBufBtn = document.getElementById('use-cat-avg-buffer-btn');
+    const amountInput = document.getElementById('budget_amount');
+
+    const categorySelect = document.getElementById('budget_category');
+    function getAvgForSelected() {
+        const cat = categorySelect ? categorySelect.value : '';
+        if (cat === 'COGS') return avgCogsExpense;
+        if (cat === 'Operating expense') return avgOperExpense;
+        return null;
+    }
+    function getHighForSelected() {
+        const cat = categorySelect ? categorySelect.value : '';
+        if (cat === 'COGS') return cogsMost.cogsExpense || 0;
+        if (cat === 'Operating expense') return operMost.operExpense || 0;
+        return null;
+    }
+
+    if (useAvgBtn) useAvgBtn.onclick = () => {
+        if (!amountInput) return;
+        const v = getAvgForSelected();
+        if (v === null) return alert('Select a main category first');
+        amountInput.value = (Math.round(v*100)/100).toFixed(2);
+    };
+    if (useHighBtn) useHighBtn.onclick = () => {
+        if (!amountInput) return;
+        const v = getHighForSelected();
+        if (v === null) return alert('Select a main category first');
+        amountInput.value = (Math.round(v*100)/100).toFixed(2);
+    };
+    if (useAvgBufBtn) useAvgBufBtn.onclick = () => {
+        if (!amountInput) return;
+        let cur = parseFloat(amountInput.value);
+        if (isNaN(cur)) {
+            const v = getAvgForSelected();
+            if (v === null) return alert('Select a main category first');
+            cur = v;
+        }
+        const out = Math.round((cur * 1.10) * 100) / 100;
+        amountInput.value = out.toFixed(2);
+    };
+}
+
+// call insights on load and when filter changes
+document.addEventListener('DOMContentLoaded', function() {
+    const filter = document.getElementById('budget_month_filter');
+    updateCategoryThreeMonthInsights();
+    if (filter) filter.addEventListener('change', updateCategoryThreeMonthInsights);
+});
 
 function renderBudgetTable(budgets, tableBodyId) {
     const tbody = document.getElementById(tableBodyId);
@@ -251,9 +401,29 @@ async function saveBudget() {
         } else {
             try {
                 const error = await response.json();
-                alert(error.detail || 'Error saving budget');
+                const detail = typeof error.detail === 'string' ? error.detail : (Array.isArray(error.detail) ? (error.detail.map(function(d){ return (d && d.msg) || (typeof d === 'string' ? d : ''); }).join(' ')) : (error.detail || ''));
+                // treat either a straight overrun or the "90% rule" message as an overrun
+                // case so that the panel appears; the server now prefers the overrun
+                // message when both rules would be triggered, but keep the client-side
+                // check for completeness.
+                const isOverrun =
+                    typeof detail === 'string' &&
+                    (detail.includes('exceeds the overall budget') || detail.includes('must not exceed 90%'));
+                if (isOverrun && typeof showCategoryOverrunPanel === 'function') {
+                    // remember the values that triggered the overrun so finalize can include them
+                    pendingBudget = { month, category, subcategory: subcategory || null, amount: parseFloat(amount) };
+                    showCategoryOverrunPanel(detail);
+                    // custom alert depending on which rule fired
+                    if (detail.includes('exceeds the overall budget')) {
+                        alert('Budget exceeds overall limit. Use the Finalize (scale to fit) panel below to scale all categories to fit.');
+                    } else {
+                        alert(detail + '\n(you may still use the Finalize panel to scale, but note the 90% limitation)');
+                    }
+                } else {
+                    alert(detail || 'Error saving budget');
+                }
             } catch (e) {
-            alert('Error saving budget');
+                alert('Error saving budget');
             }
         }
     } catch (error) {
